@@ -256,9 +256,9 @@ func TestHookRegistry_EventType(t *testing.T) {
 
 func TestPairingStore_IsUserAllowed_NoRestrictions(t *testing.T) {
 	ps := NewPairingStore()
-	// No restrictions = open access
-	if !ps.IsUserAllowed(PlatformTelegram, "anyuser") {
-		t.Error("Expected open access when no restrictions configured")
+	// No restrictions = deny by default (secure)
+	if ps.IsUserAllowed(PlatformTelegram, "anyuser") {
+		t.Error("Expected deny-by-default when no restrictions configured")
 	}
 }
 
@@ -1109,9 +1109,9 @@ func TestPairingStore_LoadAllowedUsers_StringFormat(t *testing.T) {
 func TestPairingStore_LoadAllowedUsers_NilConfig(t *testing.T) {
 	ps := NewPairingStore()
 	ps.LoadAllowedUsers(nil)
-	// Should not panic
-	if !ps.IsUserAllowed(PlatformTelegram, "anyone") {
-		t.Error("Expected open access with nil config")
+	// Should not panic; nil config = no allowed users = deny by default
+	if ps.IsUserAllowed(PlatformTelegram, "anyone") {
+		t.Error("Expected deny-by-default with nil config")
 	}
 }
 

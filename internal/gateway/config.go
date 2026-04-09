@@ -27,9 +27,10 @@ type GeneralConfig struct {
 // GatewayConfigFile is the top-level structure loaded from config.yaml's
 // messaging / gateway section.
 type GatewayConfigFile struct {
-	Platforms map[string]*PlatformConfigEntry `yaml:"platforms"`
-	Sessions  SessionConfig                  `yaml:"sessions"`
-	General   GeneralConfig                  `yaml:"general"`
+	Platforms    map[string]*PlatformConfigEntry `yaml:"platforms"`
+	Sessions     SessionConfig                   `yaml:"sessions"`
+	General      GeneralConfig                   `yaml:"general"`
+	AllowedUsers map[string]any                  `yaml:"allowed_users"`
 }
 
 // PlatformConfigEntry holds per-platform configuration from the config file.
@@ -159,6 +160,10 @@ func mergeGatewayConfig(dst, src *GatewayConfigFile) *GatewayConfigFile {
 		dst.General.ToolDelay = src.General.ToolDelay
 	}
 	dst.General.AutoApprove = src.General.AutoApprove
+
+	if src.AllowedUsers != nil {
+		dst.AllowedUsers = src.AllowedUsers
+	}
 
 	return dst
 }

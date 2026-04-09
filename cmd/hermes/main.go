@@ -370,6 +370,12 @@ var gatewayCmd = &cobra.Command{
 
 func runGateway() error {
 	gwCfg := gateway.DefaultGatewayConfig()
+
+	// Load allowed_users from config file if available.
+	if gcf, err := gateway.LoadGatewayConfig(); err == nil && gcf.AllowedUsers != nil {
+		gwCfg.AllowedUsers = gcf.AllowedUsers
+	}
+
 	runner := gateway.NewRunner(gwCfg)
 
 	// Register platform adapters from environment.

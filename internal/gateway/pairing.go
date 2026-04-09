@@ -85,17 +85,24 @@ func (p *PairingStore) LoadAllowedUsers(allowedCfg map[string]any) {
 
 // IsUserAllowed checks if a user is authorized for the given platform.
 // Returns true if:
-//   - No restrictions are set for the platform (open by default)
-//   - The wildcard "*" is set for the platform
+//   - The wildcard "*" is set for the platform (explicit open access)
 //   - The user's ID matches an allowed entry
+//   - The user was paired via /pair command
+//
+// Returns false if no restrictions are configured (deny-by-default).
+// Use "*" wildcard to explicitly allow open access.
 func (p *PairingStore) IsUserAllowed(platform Platform, userID string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	platformUsers, exists := p.allowedUsers[platform]
 	if !exists {
-		// No restrictions configured for this platform = open access.
-		return true
+		// Deny by default when no allowed_users configured for this platform.
+		// To allow open access, set allowed_users: { platform: ["*"] } in config.
+		slog.Warn("No allowed_users configured for platform, denying access. "+
+			"Set allowed_users with \"*\" for open access.",
+			"platform", platform, "user_id", userID)
+		return false
 	}
 
 	// Check wildcard.
