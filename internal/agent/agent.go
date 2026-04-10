@@ -251,6 +251,32 @@ func (a *AIAgent) RunConversation(userMessage string, history []llm.Message) (*C
 			a.sessionDB.UpdateTokenCounts(a.sessionID, resp.Usage.PromptTokens, resp.Usage.CompletionTokens, 0, 0, 0)
 		}
 
+		// Extract reasoning from think blocks if not already present
+		if resp.Reasoning == "" && resp.Content != "" {
+			cleaned, reasoning := ExtractThinkContent(resp.Content)
+			if reasoning != "" {
+				resp.Reasoning = reasoning
+				resp.Content = cleaned
+			}
+		}
+
+		// Sanitize surrogates to prevent JSON encoding failures
+		resp.Content = SanitizeSurrogates(resp.Content)
+
+		// Repair misspelled tool names
+		if len(resp.ToolCalls) > 0 && a.validTools != nil {
+			repaired, count := RepairToolCalls(resp.ToolCalls, a.validTools)
+			if count > 0 {
+				slog.Info("Auto-repaired tool names", "count", count)
+				resp.ToolCalls = repaired
+			}
+		}
+
+		// Deduplicate tool calls
+		if len(resp.ToolCalls) > 1 {
+			resp.ToolCalls = DeduplicateToolCalls(resp.ToolCalls)
+		}
+
 		// Build assistant message
 		assistantMsg := llm.Message{
 			Role:         "assistant",
@@ -373,23 +399,11 @@ func (a *AIAgent) Close() {
 	}
 }
 
-// Tools that must never run in parallel (interactive tools).
-var neverParallelTools = map[string]bool{"clarify": true}
-
-// Read-only tools that are safe to parallelize.
-var parallelSafeTools = map[string]bool{
-	"read_file": true, "search_files": true, "web_search": true,
-	"web_extract": true, "vision_analyze": true, "skills_list": true,
-	"skill_view": true, "session_search": true, "todo": true,
-	"memory": true, "ha_get_state": true, "ha_list_entities": true,
-	"ha_list_services": true, "process": true,
-}
-
-const maxParallelWorkers = 8
 
 // executeToolCalls runs tool calls, parallelizing when safe.
+// Uses smart path-based overlap detection for file-scoped tools.
 func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
-	if len(toolCalls) == 1 || !a.shouldParallelize(toolCalls) {
+	if len(toolCalls) == 1 || !ShouldParallelizeToolBatch(toolCalls) {
 		// Sequential execution
 		var results []llm.Message
 		for _, tc := range toolCalls {
@@ -408,7 +422,7 @@ func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
 	}
 
 	resultCh := make(chan indexedResult, len(toolCalls))
-	sem := make(chan struct{}, maxParallelWorkers)
+	sem := make(chan struct{}, MaxParallelWorkers)
 
 	for i, tc := range toolCalls {
 		sem <- struct{}{} // acquire
@@ -429,22 +443,6 @@ func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
 	return collected
 }
 
-func (a *AIAgent) shouldParallelize(toolCalls []llm.ToolCall) bool {
-	for _, tc := range toolCalls {
-		if neverParallelTools[tc.Function.Name] {
-			return false
-		}
-	}
-	// Parallelize if all tools are known-safe, or if there are 2+ calls
-	allSafe := true
-	for _, tc := range toolCalls {
-		if !parallelSafeTools[tc.Function.Name] {
-			allSafe = false
-			break
-		}
-	}
-	return allSafe
-}
 
 func (a *AIAgent) executeSingleTool(tc llm.ToolCall) llm.Message {
 	toolName := tc.Function.Name
