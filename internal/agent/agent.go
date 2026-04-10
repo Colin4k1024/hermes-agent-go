@@ -42,6 +42,7 @@ type AIAgent struct {
 	skipContextFiles     bool
 	skipMemory           bool
 	persistSession       bool
+	compressionCfg       CompressionConfig
 
 	// Session resume
 	resumeSessionID string
@@ -91,6 +92,7 @@ func New(opts ...AgentOption) (*AIAgent, error) {
 		maxIterations:  cfg.MaxIterations,
 		platform:       "cli",
 		persistSession: true,
+		compressionCfg: DefaultCompressionConfig(),
 		lastActivity:   time.Now(),
 	}
 
