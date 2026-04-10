@@ -2,6 +2,7 @@ package platforms
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -92,13 +93,17 @@ func (s *SlackAdapter) Disconnect() error {
 }
 
 // Send sends a text message to a Slack channel.
+// Applies Markdown → Slack mrkdwn formatting.
 func (s *SlackAdapter) Send(ctx context.Context, chatID string, text string, metadata map[string]string) (*gateway.SendResult, error) {
 	if s.api == nil {
 		return nil, fmt.Errorf("not connected")
 	}
 
+	// Convert Markdown to Slack mrkdwn.
+	formatted := FormatSlackMessage(text)
+
 	opts := []slack.MsgOption{
-		slack.MsgOptionText(text, false),
+		slack.MsgOptionText(formatted, false),
 	}
 
 	// Thread support.
@@ -205,6 +210,17 @@ func (s *SlackAdapter) handleEvent(evt socketmode.Event) {
 		}
 		s.socket.Ack(*evt.Request)
 		s.handleSlashCommand(cmd)
+
+	case socketmode.EventTypeInteractive:
+		callback, ok := evt.Data.(slack.InteractionCallback)
+		if !ok {
+			return
+		}
+		s.socket.Ack(*evt.Request)
+		payload, err := json.Marshal(callback)
+		if err == nil {
+			s.HandleInteractiveCallback(payload)
+		}
 	}
 }
 
