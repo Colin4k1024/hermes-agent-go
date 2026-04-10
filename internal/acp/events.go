@@ -35,6 +35,9 @@ func (b *EventBroker) Subscribe(sessionID string) (chan Event, func()) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Buffer size 32: SSE clients may lag due to network latency or editor
+	// rendering. A buffer prevents blocking the publisher. Overflow events
+	// are dropped with a warning log (see Publish).
 	ch := make(chan Event, 32)
 
 	if b.clients[sessionID] == nil {
