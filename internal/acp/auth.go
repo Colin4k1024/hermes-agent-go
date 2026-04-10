@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,7 +35,8 @@ func withAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		provided := strings.TrimPrefix(auth, "Bearer ")
-		if provided != token {
+		// Constant-time comparison to prevent timing attacks.
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
 			slog.Warn("ACP auth failed", "remote", r.RemoteAddr)
 			writeError(w, http.StatusForbidden, "invalid token")
 			return

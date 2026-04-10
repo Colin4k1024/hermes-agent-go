@@ -125,7 +125,7 @@ func (s *ACPServer) Start() error {
 	mux.HandleFunc("GET /v1/events", withAuth(s.handleEvents))
 
 	s.server = &http.Server{
-		Addr:        fmt.Sprintf(":%d", s.port),
+		Addr:        fmt.Sprintf("127.0.0.1:%d", s.port),
 		Handler:     withCORS(mux),
 		ReadTimeout: 30 * time.Second,
 		IdleTimeout: 60 * time.Second,
