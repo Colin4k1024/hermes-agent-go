@@ -37,22 +37,12 @@ var (
 
 // getOrCreateBrowserSession returns the active browser session,
 // creating one if needed.
-func getOrCreateBrowserSession() (*BrowserSession, error) {
-	browserSessionMu.Lock()
-	defer browserSessionMu.Unlock()
-
-	if activeBrowserSession != nil {
-		return activeBrowserSession, nil
-	}
-
+// newBrowserbaseSession creates a new BrowserSession for the Browserbase API.
+func newBrowserbaseSession() (*BrowserSession, error) {
 	apiKey := os.Getenv("BROWSERBASE_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf(
-			"BROWSERBASE_API_KEY is not set. To use browser tools:\n" +
-				"  1. Sign up at https://www.browserbase.com\n" +
-				"  2. Create a project and get your API key\n" +
-				"  3. Set the environment variable: export BROWSERBASE_API_KEY=your_key\n" +
-				"  4. Optionally set BROWSERBASE_PROJECT_ID for project-scoped sessions")
+			"BROWSERBASE_API_KEY is not set")
 	}
 
 	projectID := os.Getenv("BROWSERBASE_PROJECT_ID")
@@ -65,9 +55,25 @@ func getOrCreateBrowserSession() (*BrowserSession, error) {
 		},
 	}
 
-	// Create a new Browserbase session.
 	if err := session.createSession(); err != nil {
 		return nil, fmt.Errorf("create browser session: %w", err)
+	}
+
+	return session, nil
+}
+
+// getOrCreateBrowserSession returns the active browser session (legacy, used by BrowserbaseBackend).
+func getOrCreateBrowserSession() (*BrowserSession, error) {
+	browserSessionMu.Lock()
+	defer browserSessionMu.Unlock()
+
+	if activeBrowserSession != nil {
+		return activeBrowserSession, nil
+	}
+
+	session, err := newBrowserbaseSession()
+	if err != nil {
+		return nil, err
 	}
 
 	activeBrowserSession = session
@@ -438,11 +444,15 @@ func closeBrowserSession() {
 	defer browserSessionMu.Unlock()
 
 	if activeBrowserSession != nil {
-		// Attempt to close the session via API.
-		activeBrowserSession.apiRequest("DELETE",
-			fmt.Sprintf("/sessions/%s", activeBrowserSession.sessionID), nil)
+		activeBrowserSession.close()
 		activeBrowserSession = nil
 	}
+}
+
+// close terminates the Browserbase session.
+func (bs *BrowserSession) close() {
+	bs.apiRequest("DELETE",
+		fmt.Sprintf("/sessions/%s", bs.sessionID), nil)
 }
 
 // jsonStringLiteral returns a JSON-encoded string literal for embedding in JS.
@@ -458,17 +468,17 @@ func init() {
 	// These replace the stubs defined in browser.go.
 
 	overrides := map[string]ToolHandler{
-		"browser_navigate":  handleBrowserNavigateImpl,
-		"browser_snapshot":  handleBrowserSnapshotImpl,
-		"browser_click":     handleBrowserClickImpl,
-		"browser_type":      handleBrowserTypeImpl,
-		"browser_scroll":    handleBrowserScrollImpl,
-		"browser_back":      handleBrowserBackImpl,
-		"browser_press":     handleBrowserPressImpl,
+		"browser_navigate":   handleBrowserNavigateImpl,
+		"browser_snapshot":   handleBrowserSnapshotImpl,
+		"browser_click":      handleBrowserClickImpl,
+		"browser_type":       handleBrowserTypeImpl,
+		"browser_scroll":     handleBrowserScrollImpl,
+		"browser_back":       handleBrowserBackImpl,
+		"browser_press":      handleBrowserPressImpl,
 		"browser_get_images": handleBrowserGetImagesImpl,
-		"browser_vision":    handleBrowserVisionImpl,
-		"browser_console":   handleBrowserConsoleImpl,
-		"browser_close":     handleBrowserCloseImpl,
+		"browser_vision":     handleBrowserVisionImpl,
+		"browser_console":    handleBrowserConsoleImpl,
+		"browser_close":      handleBrowserCloseImpl,
 	}
 
 	for name, handler := range overrides {
@@ -497,12 +507,12 @@ func handleBrowserNavigateImpl(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"url is required"}`
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_navigate", err)
 	}
 
-	result, err := session.navigate(url)
+	result, err := backend.Navigate(url)
 	if err != nil {
 		return browserError("browser_navigate", err)
 	}
@@ -511,12 +521,12 @@ func handleBrowserNavigateImpl(args map[string]any, ctx *ToolContext) string {
 }
 
 func handleBrowserSnapshotImpl(args map[string]any, ctx *ToolContext) string {
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_snapshot", err)
 	}
 
-	result, err := session.snapshot()
+	result, err := backend.Snapshot()
 	if err != nil {
 		return browserError("browser_snapshot", err)
 	}
@@ -530,12 +540,12 @@ func handleBrowserClickImpl(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"ref is required"}`
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_click", err)
 	}
 
-	result, err := session.click(ref)
+	result, err := backend.Click(ref)
 	if err != nil {
 		return browserError("browser_click", err)
 	}
@@ -552,12 +562,12 @@ func handleBrowserTypeImpl(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"ref and text are required"}`
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_type", err)
 	}
 
-	result, err := session.typeText(ref, text, clearFirst)
+	result, err := backend.Type(ref, text, clearFirst)
 	if err != nil {
 		return browserError("browser_type", err)
 	}
@@ -576,12 +586,12 @@ func handleBrowserScrollImpl(args map[string]any, ctx *ToolContext) string {
 		amount = int(a)
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_scroll", err)
 	}
 
-	result, err := session.scroll(direction, amount)
+	result, err := backend.Scroll(direction, amount)
 	if err != nil {
 		return browserError("browser_scroll", err)
 	}
@@ -590,12 +600,12 @@ func handleBrowserScrollImpl(args map[string]any, ctx *ToolContext) string {
 }
 
 func handleBrowserBackImpl(args map[string]any, ctx *ToolContext) string {
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_back", err)
 	}
 
-	result, err := session.goBack()
+	result, err := backend.GoBack()
 	if err != nil {
 		return browserError("browser_back", err)
 	}
@@ -609,12 +619,12 @@ func handleBrowserPressImpl(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"key is required"}`
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_press", err)
 	}
 
-	result, err := session.pressKey(key)
+	result, err := backend.PressKey(key)
 	if err != nil {
 		return browserError("browser_press", err)
 	}
@@ -623,12 +633,12 @@ func handleBrowserPressImpl(args map[string]any, ctx *ToolContext) string {
 }
 
 func handleBrowserGetImagesImpl(args map[string]any, ctx *ToolContext) string {
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_get_images", err)
 	}
 
-	result, err := session.getImages()
+	result, err := backend.GetImages()
 	if err != nil {
 		return browserError("browser_get_images", err)
 	}
@@ -640,7 +650,7 @@ func handleBrowserVisionImpl(args map[string]any, ctx *ToolContext) string {
 	// Vision requires a screenshot + multimodal LLM. For now, we take a
 	// snapshot and return it -- full vision analysis would require piping
 	// the screenshot through a vision model.
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_vision", err)
 	}
@@ -650,7 +660,7 @@ func handleBrowserVisionImpl(args map[string]any, ctx *ToolContext) string {
 		prompt = "Describe what you see on this page."
 	}
 
-	snapshot, err := session.snapshot()
+	snapshot, err := backend.Snapshot()
 	if err != nil {
 		return browserError("browser_vision", err)
 	}
@@ -667,12 +677,12 @@ func handleBrowserConsoleImpl(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"script is required"}`
 	}
 
-	session, err := getOrCreateBrowserSession()
+	backend, err := getOrCreateBackend()
 	if err != nil {
 		return browserError("browser_console", err)
 	}
 
-	result, err := session.executeScript(script)
+	result, err := backend.ExecuteScript(script)
 	if err != nil {
 		return browserError("browser_console", err)
 	}
@@ -681,18 +691,18 @@ func handleBrowserConsoleImpl(args map[string]any, ctx *ToolContext) string {
 }
 
 func handleBrowserCloseImpl(args map[string]any, ctx *ToolContext) string {
-	browserSessionMu.Lock()
-	hasSession := activeBrowserSession != nil
-	browserSessionMu.Unlock()
+	activeBackendMu.Lock()
+	hasBackend := activeBackend != nil
+	activeBackendMu.Unlock()
 
-	if !hasSession {
+	if !hasBackend {
 		return toJSON(map[string]any{
 			"success": true,
 			"message": "No active browser session to close.",
 		})
 	}
 
-	closeBrowserSession()
+	closeActiveBackend()
 
 	return toJSON(map[string]any{
 		"success": true,
