@@ -2,11 +2,13 @@ package tools
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
+	"github.com/hermes-agent/hermes-agent-go/internal/llm"
 )
 
 // ---------- Configuration ----------
@@ -96,13 +99,14 @@ type jsonRPCError struct {
 
 // MCPClient manages the lifecycle and communication with an MCP server.
 type MCPClient struct {
-	name      string
-	config    MCPServerConfig
-	transport mcpTransport
-	mu        sync.Mutex
-	connected bool
-	tools     []mcpToolDef
-	nextID    atomic.Int64
+	name            string
+	config          MCPServerConfig
+	transport       mcpTransport
+	mu              sync.Mutex
+	connected       bool
+	tools           []mcpToolDef
+	nextID          atomic.Int64
+	samplingHandler *SamplingHandler
 }
 
 type mcpToolDef struct {
@@ -121,10 +125,11 @@ type mcpTransport interface {
 // ---------- Stdio transport ----------
 
 type stdioTransport struct {
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout *bufio.Scanner
-	env    map[string]string
+	cmd             *exec.Cmd
+	stdin           io.WriteCloser
+	stdout          *bufio.Scanner
+	env             map[string]string
+	onServerRequest func(data []byte) // callback for server-to-client requests
 }
 
 func newStdioTransport(cfg MCPServerConfig) *stdioTransport {
@@ -173,19 +178,37 @@ func (t *stdioTransport) Send(req jsonRPCRequest) error {
 }
 
 func (t *stdioTransport) Receive() (*jsonRPCResponse, error) {
-	if !t.stdout.Scan() {
-		if err := t.stdout.Err(); err != nil {
-			return nil, fmt.Errorf("read response: %w", err)
+	for {
+		if !t.stdout.Scan() {
+			if err := t.stdout.Err(); err != nil {
+				return nil, fmt.Errorf("read response: %w", err)
+			}
+			return nil, fmt.Errorf("MCP server closed connection")
 		}
-		return nil, fmt.Errorf("MCP server closed connection")
-	}
 
-	line := t.stdout.Text()
-	var resp jsonRPCResponse
-	if err := json.Unmarshal([]byte(line), &resp); err != nil {
-		return nil, fmt.Errorf("parse response: %w (line: %s)", err, truncateOutput(line, 200))
+		line := t.stdout.Text()
+
+		// Check if this is a server-to-client request (e.g. sampling/createMessage).
+		var probe struct {
+			Method string `json:"method"`
+			ID     any    `json:"id"`
+		}
+		if json.Unmarshal([]byte(line), &probe) == nil && probe.Method != "" && probe.ID != nil {
+			// This is a request from the server, not a response. Handle via callback.
+			if t.onServerRequest != nil {
+				t.onServerRequest([]byte(line))
+			} else {
+				slog.Debug("stdio: ignoring server request (no handler)", "method", probe.Method)
+			}
+			continue
+		}
+
+		var resp jsonRPCResponse
+		if err := json.Unmarshal([]byte(line), &resp); err != nil {
+			return nil, fmt.Errorf("parse response: %w (line: %s)", err, truncateOutput(line, 200))
+		}
+		return &resp, nil
 	}
-	return &resp, nil
 }
 
 func (t *stdioTransport) Close() error {
@@ -213,6 +236,91 @@ func NewMCPClient(name string, cfg MCPServerConfig) *MCPClient {
 	}
 }
 
+// SetSamplingHandler attaches a sampling handler to this client.
+// Must be called before Connect.
+func (c *MCPClient) SetSamplingHandler(h *SamplingHandler) {
+	c.samplingHandler = h
+}
+
+// mcpServerRequest is a JSON-RPC request sent by the MCP server to the client.
+type mcpServerRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      int64           `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+// parseSamplingRequest parses raw JSON into an mcpServerRequest and returns it
+// only if the method is sampling/createMessage. Returns nil for other methods.
+func parseSamplingRequest(data []byte) *mcpServerRequest {
+	var req mcpServerRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		slog.Warn("MCP sampling: failed to parse server request", "error", err)
+		return nil
+	}
+	if req.Method != "sampling/createMessage" {
+		slog.Debug("MCP server request ignored (not sampling)", "method", req.Method)
+		return nil
+	}
+	return &req
+}
+
+// handleSamplingOnStdio handles a sampling request on the stdio transport by
+// writing the JSON-RPC response directly to stdin.
+func handleSamplingOnStdio(serverName string, handler *SamplingHandler, st *stdioTransport, data []byte) {
+	req := parseSamplingRequest(data)
+	if req == nil {
+		return
+	}
+
+	resp := handler.HandleRequest(context.Background(), serverName, req.ID, req.Params)
+
+	respData, err := json.Marshal(resp)
+	if err != nil {
+		slog.Error("MCP sampling: failed to marshal response", "error", err)
+		return
+	}
+
+	respData = append(respData, '\n')
+	if _, err := st.stdin.Write(respData); err != nil {
+		slog.Error("MCP sampling: failed to send response via stdio", "error", err)
+	}
+}
+
+// handleSamplingOnSSE handles a sampling request received via SSE and POSTs
+// the JSON-RPC response back to the MCP server.
+func handleSamplingOnSSE(serverName string, handler *SamplingHandler, sseT *sseTransportV2, data []byte) {
+	req := parseSamplingRequest(data)
+	if req == nil {
+		return
+	}
+
+	resp := handler.HandleRequest(context.Background(), serverName, req.ID, req.Params)
+
+	respData, err := json.Marshal(resp)
+	if err != nil {
+		slog.Error("MCP sampling SSE: failed to marshal response", "error", err)
+		return
+	}
+
+	httpReq, err := http.NewRequestWithContext(sseT.ctx, "POST", sseT.postURL, bytes.NewReader(respData))
+	if err != nil {
+		slog.Error("MCP sampling SSE: failed to create POST request", "error", err)
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	for k, v := range sseT.headers {
+		httpReq.Header.Set(k, v)
+	}
+
+	httpResp, err := sseT.httpClient.Do(httpReq)
+	if err != nil {
+		slog.Error("MCP sampling SSE: failed to POST response", "error", err)
+		return
+	}
+	httpResp.Body.Close()
+}
+
 // Connect establishes a connection to the MCP server and performs initialization.
 func (c *MCPClient) Connect(ctx context.Context) error {
 	c.mu.Lock()
@@ -232,6 +340,14 @@ func (c *MCPClient) Connect(ctx context.Context) error {
 		st := newStdioTransport(c.config)
 		cmd := exec.Command(c.config.Command, c.config.Args...)
 		st.cmd = cmd
+		// Wire sampling handler for server-to-client requests on stdio.
+		if c.samplingHandler != nil {
+			serverName := c.name
+			handler := c.samplingHandler
+			st.onServerRequest = func(data []byte) {
+				handleSamplingOnStdio(serverName, handler, st, data)
+			}
+		}
 		c.transport = st
 	case "sse":
 		if c.config.URL == "" {
@@ -243,7 +359,16 @@ func (c *MCPClient) Connect(ctx context.Context) error {
 				headers[strings.TrimPrefix(k, "HEADER_")] = v
 			}
 		}
-		c.transport = newSSETransportV2(c.config.URL, headers)
+		sseT := newSSETransportV2(c.config.URL, headers)
+		// Wire sampling handler for server-to-client requests on SSE.
+		if c.samplingHandler != nil {
+			serverName := c.name
+			handler := c.samplingHandler
+			sseT.onServerRequest = func(data []byte) {
+				handleSamplingOnSSE(serverName, handler, sseT, data)
+			}
+		}
+		c.transport = sseT
 	default:
 		return fmt.Errorf("unknown MCP transport: %s", transport)
 	}
@@ -260,7 +385,7 @@ func (c *MCPClient) Connect(ctx context.Context) error {
 		Method:  "initialize",
 		Params: map[string]any{
 			"protocolVersion": "2024-11-05",
-			"capabilities":    map[string]any{},
+			"capabilities":    map[string]any{"sampling": map[string]any{}},
 			"clientInfo": map[string]any{
 				"name":    "hermes-agent",
 				"version": "1.0.0",
@@ -500,6 +625,13 @@ func getMCPManager() *mcpManager {
 // RegisterMCPTools discovers and registers tools from MCP server configurations.
 // It connects to each configured server, discovers tools, and registers them.
 func RegisterMCPTools(platform string) {
+	RegisterMCPToolsWithSampling(platform, nil)
+}
+
+// RegisterMCPToolsWithSampling is like RegisterMCPTools but accepts an optional
+// LLM client to enable MCP sampling support. When client is non-nil, connected
+// MCP servers can issue sampling/createMessage requests.
+func RegisterMCPToolsWithSampling(platform string, samplingClient *llm.Client) {
 	mcpCfg, err := LoadMCPConfig()
 	if err != nil {
 		slog.Debug("No MCP configuration found", "error", err)
@@ -509,6 +641,13 @@ func RegisterMCPTools(platform string) {
 	if len(mcpCfg.Servers) == 0 {
 		slog.Debug("No MCP servers configured")
 		return
+	}
+
+	// Create a shared sampling handler if an LLM client was provided.
+	var samplingHandler *SamplingHandler
+	if samplingClient != nil {
+		samplingHandler = NewSamplingHandler(samplingClient)
+		slog.Info("MCP sampling support enabled")
 	}
 
 	mgr := getMCPManager()
@@ -530,6 +669,9 @@ func RegisterMCPTools(platform string) {
 		slog.Info("Connecting to MCP server", "name", name, "command", server.Command)
 
 		client := NewMCPClient(name, server)
+		if samplingHandler != nil {
+			client.SetSamplingHandler(samplingHandler)
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		if err := client.Connect(ctx); err != nil {

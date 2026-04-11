@@ -44,6 +44,10 @@ type sseTransportV2 struct {
 
 	// postURL is the endpoint for sending JSON-RPC requests (derived from SSE URL).
 	postURL string
+
+	// onServerRequest is called when the SSE stream receives a server-to-client
+	// request (e.g. sampling/createMessage). The callback receives the raw JSON.
+	onServerRequest func(data []byte)
 }
 
 func newSSETransportV2(url string, headers map[string]string) *sseTransportV2 {
@@ -152,12 +156,23 @@ func (t *sseTransportV2) dispatchEvent(evt sseEvent) {
 		return
 	}
 
-	// Check if it's a notification (no "id" field in JSON-RPC) or response.
+	// Check if it's a notification (no "id" field in JSON-RPC), a server
+	// request (has both "id" and "method"), or a response (has "id", no "method").
 	var probe struct {
 		ID     any    `json:"id"`
 		Method string `json:"method"`
 	}
 	json.Unmarshal([]byte(evt.Data), &probe)
+
+	if probe.Method != "" && probe.ID != nil {
+		// Server-to-client request (e.g. sampling/createMessage).
+		if t.onServerRequest != nil {
+			t.onServerRequest([]byte(evt.Data))
+		} else {
+			slog.Debug("sse: ignoring server request (no handler)", "method", probe.Method)
+		}
+		return
+	}
 
 	if probe.Method != "" && probe.ID == nil {
 		// Notification.
