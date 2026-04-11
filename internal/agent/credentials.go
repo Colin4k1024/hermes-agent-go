@@ -89,6 +89,25 @@ func (p *CredentialPool) GetCredentialForModel(provider, model string) *Credenti
 	return &best
 }
 
+// NewRotatorForProvider creates a CredentialRotator for the given provider
+// using all credentials in the pool. The strategy is set from the config's
+// credential_pool.strategy field (defaults to round_robin).
+func (p *CredentialPool) NewRotatorForProvider(provider string, cfg *config.Config) *CredentialRotator {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	provider = normalizeProvider(provider)
+	creds := p.providers[provider]
+
+	// Copy to avoid sharing slices.
+	copied := make([]Credential, len(creds))
+	copy(copied, creds)
+
+	rotator := NewCredentialRotator(copied)
+	rotator.Strategy = StrategyFromConfig(cfg)
+	return rotator
+}
+
 // AllProviders returns a sorted list of all providers with credentials.
 func (p *CredentialPool) AllProviders() []string {
 	p.mu.RLock()
