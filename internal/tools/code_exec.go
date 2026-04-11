@@ -1,9 +1,9 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,6 +71,8 @@ func handleExecuteCode(args map[string]any, ctx *ToolContext) string {
 		return `{"error":"code is required"}`
 	}
 
+	cfg := DefaultSandboxConfig()
+
 	timeout := 30
 	if t, ok := args["timeout"].(float64); ok && t > 0 {
 		timeout = int(t)
@@ -78,18 +80,19 @@ func handleExecuteCode(args map[string]any, ctx *ToolContext) string {
 	if timeout > 120 {
 		timeout = 120
 	}
+	cfg.Timeout = time.Duration(timeout) * time.Second
 
 	switch language {
 	case "python":
-		return executePython(code, timeout)
+		return executePython(code, &cfg)
 	case "bash":
-		return executeBash(code, timeout)
+		return executeBash(code, &cfg)
 	default:
 		return toJSON(map[string]any{"error": fmt.Sprintf("Unsupported language: %s", language)})
 	}
 }
 
-func executePython(code string, timeout int) string {
+func executePython(code string, cfg *SandboxConfig) string {
 	// Write code to a temporary file
 	tmpDir := filepath.Join(config.HermesHome(), "cache")
 	os.MkdirAll(tmpDir, 0755)
@@ -100,83 +103,58 @@ func executePython(code string, timeout int) string {
 	}
 	defer os.Remove(tmpFile)
 
-	execCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(execCtx, "python3", tmpFile)
-	cmd.Env = safeEnv()
-	cmd.Dir = tmpDir
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	startTime := time.Now()
-	err := cmd.Run()
-	duration := time.Since(startTime)
-
-	exitCode := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else if execCtx.Err() == context.DeadlineExceeded {
-			return toJSON(map[string]any{
-				"error":     "Execution timed out",
-				"timeout":   timeout,
-				"stdout":    truncateOutput(stdout.String(), 50000),
-				"stderr":    truncateOutput(stderr.String(), 10000),
-				"exit_code": -1,
-			})
-		}
-	}
-
-	return toJSON(map[string]any{
-		"stdout":      truncateOutput(stdout.String(), 50000),
-		"stderr":      truncateOutput(stderr.String(), 10000),
-		"exit_code":   exitCode,
-		"language":    "python",
-		"duration_ms": duration.Milliseconds(),
-	})
+	return runSandboxed("python3", []string{tmpFile}, tmpDir, "python", cfg)
 }
 
-func executeBash(code string, timeout int) string {
-	execCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+func executeBash(code string, cfg *SandboxConfig) string {
+	cwd, _ := os.Getwd()
+	return runSandboxed("bash", []string{"-c", code}, cwd, "bash", cfg)
+}
+
+// runSandboxed executes a command inside the sandbox constraints defined by cfg.
+func runSandboxed(bin string, cmdArgs []string, workDir, language string, cfg *SandboxConfig) string {
+	execCtx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(execCtx, "bash", "-c", code)
+	cmd := exec.CommandContext(execCtx, bin, cmdArgs...)
 	cmd.Env = safeEnv()
+	cmd.Dir = workDir
 
-	cwd, _ := os.Getwd()
-	cmd.Dir = cwd
+	stdoutW := NewLimitedWriter(cfg.MaxStdoutBytes)
+	stderrW := NewLimitedWriter(cfg.MaxStderrBytes)
+	cmd.Stdout = stdoutW
+	cmd.Stderr = stderrW
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
+	metrics := ExecMetrics{}
 	startTime := time.Now()
 	err := cmd.Run()
-	duration := time.Since(startTime)
+	metrics.WallTimeMs = time.Since(startTime).Milliseconds()
+	metrics.StdoutBytes = stdoutW.Len()
+	metrics.StderrBytes = stderrW.Len()
 
-	exitCode := 0
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
+			metrics.ExitCode = exitErr.ExitCode()
 		} else if execCtx.Err() == context.DeadlineExceeded {
+			metrics.ExitCode = -1
+			slog.Info("sandbox execution timed out", "language", language, "timeout", cfg.Timeout)
 			return toJSON(map[string]any{
 				"error":     "Execution timed out",
-				"timeout":   timeout,
-				"stdout":    truncateOutput(stdout.String(), 50000),
-				"stderr":    truncateOutput(stderr.String(), 10000),
-				"exit_code": -1,
+				"timeout":   int(cfg.Timeout.Seconds()),
+				"stdout":    stdoutW.String(),
+				"stderr":    stderrW.String(),
+				"exit_code": metrics.ExitCode,
+				"metrics":   metrics,
 			})
 		}
 	}
 
 	return toJSON(map[string]any{
-		"stdout":      truncateOutput(stdout.String(), 50000),
-		"stderr":      truncateOutput(stderr.String(), 10000),
-		"exit_code":   exitCode,
-		"language":    "bash",
-		"duration_ms": duration.Milliseconds(),
+		"stdout":      stdoutW.String(),
+		"stderr":      stderrW.String(),
+		"exit_code":   metrics.ExitCode,
+		"language":    language,
+		"duration_ms": metrics.WallTimeMs,
+		"metrics":     metrics,
 	})
 }
