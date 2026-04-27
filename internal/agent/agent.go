@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,13 +65,17 @@ type AIAgent struct {
 	validTools    map[string]bool
 	systemPrompt  string
 
-	// Interrupt and steer support
-	mu                 sync.Mutex
-	interruptRequested bool
-	steerMessage       string
-	apiCallCount       int
-	lastActivity       time.Time
-	heartbeatCh        chan struct{}
+	// Interrupt support (lock-free)
+	interruptRequested atomic.Bool
+
+	// Steer support (needs mutex for read-and-clear)
+	steerMu      sync.Mutex
+	steerMessage string
+
+	// Runtime counters
+	apiCallCount int
+	lastActivity time.Time
+	heartbeatCh  chan struct{}
 
 	// Compression cooldown
 	lastCompressionFailure time.Time
@@ -212,7 +217,7 @@ func (a *AIAgent) RunConversation(userMessage string, history []llm.Message) (*C
 	}
 
 	a.apiCallCount = 0
-	a.interruptRequested = false
+	a.interruptRequested.Store(false)
 
 	// Main agent loop
 	emptyRetryCount := 0
@@ -435,30 +440,25 @@ func (a *AIAgent) RunConversation(userMessage string, history []llm.Message) (*C
 	return result, nil
 }
 
-// Interrupt requests the agent to stop after the current tool call.
+// Interrupt requests the agent to stop after the current tool call (lock-free).
 func (a *AIAgent) Interrupt() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.interruptRequested = true
+	a.interruptRequested.Store(true)
 }
 
 func (a *AIAgent) isInterrupted() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.interruptRequested
+	return a.interruptRequested.Load()
 }
 
-// Steer injects a user message into the conversation at the next safe point
-// (after the current tool call completes) without breaking prompt cache.
+// Steer injects a user message into the conversation at the next safe point.
 func (a *AIAgent) Steer(prompt string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
 	a.steerMessage = prompt
 }
 
 func (a *AIAgent) consumeSteer() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
 	msg := a.steerMessage
 	a.steerMessage = ""
 	return msg
@@ -520,28 +520,43 @@ func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
 		return results
 	}
 
-	// Parallel execution
+	// Parallel execution with WaitGroup + timeout
 	type indexedResult struct {
 		index int
 		msg   llm.Message
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	var wg sync.WaitGroup
 	resultCh := make(chan indexedResult, len(toolCalls))
 	sem := make(chan struct{}, MaxParallelWorkers)
 
 	for i, tc := range toolCalls {
-		sem <- struct{}{} // acquire
+		wg.Add(1)
 		go func(idx int, call llm.ToolCall) {
-			defer func() { <-sem }() // release
-			msg := a.executeSingleTool(call)
-			resultCh <- indexedResult{index: idx, msg: msg}
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+				msg := a.executeSingleTool(call)
+				resultCh <- indexedResult{index: idx, msg: msg}
+			case <-ctx.Done():
+				resultCh <- indexedResult{index: idx, msg: llm.Message{
+					Role:       "tool",
+					Content:    `{"error":"tool execution timed out"}`,
+					ToolCallID: call.ID,
+					ToolName:   call.Function.Name,
+				}}
+			}
 		}(i, tc)
 	}
 
-	// Collect results in order
+	go func() { wg.Wait(); close(resultCh) }()
+
 	collected := make([]llm.Message, len(toolCalls))
-	for range toolCalls {
-		ir := <-resultCh
+	for ir := range resultCh {
 		collected[ir.index] = ir.msg
 	}
 

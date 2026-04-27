@@ -204,15 +204,17 @@ func NewGatewayApprovalQueue() *GatewayApprovalQueue {
 
 // Submit adds a pending approval and returns a channel for the result.
 func (q *GatewayApprovalQueue) Submit(sessionKey string, req ApprovalRequest) <-chan ApprovalResult {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	ch := make(chan ApprovalResult, 1) // allocate outside lock
 
+	q.mu.Lock()
 	pa := &pendingApproval{
 		Request:  req,
-		ResultCh: make(chan ApprovalResult, 1),
+		ResultCh: ch,
 	}
 	q.queues[sessionKey] = append(q.queues[sessionKey], pa)
-	return pa.ResultCh
+	q.mu.Unlock()
+
+	return ch
 }
 
 // Resolve resolves the oldest pending approval (FIFO). Returns count resolved.
@@ -275,7 +277,10 @@ func (q *GatewayApprovalQueue) ClearSession(sessionKey string) {
 	defer q.mu.Unlock()
 
 	for _, pa := range q.queues[sessionKey] {
-		pa.ResultCh <- ApprovalResult{Approved: false, Scope: ApproveDeny}
+		select {
+		case pa.ResultCh <- ApprovalResult{Approved: false, Scope: ApproveDeny}:
+		default:
+		}
 		close(pa.ResultCh)
 	}
 	delete(q.queues, sessionKey)

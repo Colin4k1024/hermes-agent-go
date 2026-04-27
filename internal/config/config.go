@@ -32,8 +32,23 @@ type Config struct {
 
 	ProviderRouting map[string]any `yaml:"provider_routing"`
 
+	// SaaS / Stateless
+	Database DatabaseConfig `yaml:"database"`
+	Redis    RedisConfig    `yaml:"redis"`
+
 	// Internal
 	configVersion int `yaml:"_config_version"`
+}
+
+// DatabaseConfig controls the state store backend.
+type DatabaseConfig struct {
+	Driver string `yaml:"driver"` // "postgres" or "sqlite" (default)
+	URL    string `yaml:"url"`
+}
+
+// RedisConfig controls the Redis connection for distributed state.
+type RedisConfig struct {
+	URL string `yaml:"url"`
 }
 
 // DisplayConfig controls CLI display options.

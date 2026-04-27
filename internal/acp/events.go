@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,8 +20,9 @@ type Event struct {
 
 // EventBroker manages SSE client connections and event broadcasting.
 type EventBroker struct {
-	mu      sync.RWMutex
-	clients map[string]map[chan Event]struct{}
+	mu            sync.RWMutex
+	clients       map[string]map[chan Event]struct{}
+	DroppedEvents atomic.Int64
 }
 
 // NewEventBroker creates a new SSE event broker.
@@ -79,8 +81,9 @@ func (b *EventBroker) Publish(sessionID, eventType string, data any) {
 		select {
 		case ch <- evt:
 		default:
+			b.DroppedEvents.Add(1)
 			slog.Warn("SSE client channel full, dropping event",
-				"session_id", sessionID, "type", eventType)
+				"session_id", sessionID, "type", eventType, "total_dropped", b.DroppedEvents.Load())
 		}
 	}
 }
