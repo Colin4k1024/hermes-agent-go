@@ -3,11 +3,14 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"regexp"
 )
 
 type contextKey string
 
 const tenantKey contextKey = "tenant_id"
+
+var tenantIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 // TenantFromContext extracts the tenant ID from context.
 func TenantFromContext(ctx context.Context) string {
@@ -26,6 +29,10 @@ func TenantMiddleware(next http.Handler) http.Handler {
 		tenantID := r.Header.Get("X-Tenant-ID")
 		if tenantID == "" {
 			tenantID = "default"
+		}
+		if !tenantIDPattern.MatchString(tenantID) {
+			http.Error(w, "invalid tenant ID", http.StatusBadRequest)
+			return
 		}
 		ctx := WithTenant(r.Context(), tenantID)
 		next.ServeHTTP(w, r.WithContext(ctx))

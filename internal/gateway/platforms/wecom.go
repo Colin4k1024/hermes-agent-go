@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -12,6 +13,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/gateway"
@@ -23,6 +26,7 @@ type WeComAdapter struct {
 	corpID      string
 	agentID     string
 	secret      string
+	token       string // verification token for callback signature
 	encodingKey string // AES key for callback decryption
 	accessToken string
 	webhookPort int
@@ -31,7 +35,7 @@ type WeComAdapter struct {
 	cancel      context.CancelFunc
 }
 
-func NewWeComAdapter(corpID, agentID, secret, encodingKey string, webhookPort int) *WeComAdapter {
+func NewWeComAdapter(corpID, agentID, secret, token, encodingKey string, webhookPort int) *WeComAdapter {
 	if webhookPort == 0 {
 		webhookPort = 8078
 	}
@@ -40,6 +44,7 @@ func NewWeComAdapter(corpID, agentID, secret, encodingKey string, webhookPort in
 		corpID:              corpID,
 		agentID:             agentID,
 		secret:              secret,
+		token:               token,
 		encodingKey:         encodingKey,
 		webhookPort:         webhookPort,
 	}
@@ -168,9 +173,18 @@ type wecomDecryptedMsg struct {
 }
 
 func (w *WeComAdapter) handleCallback(rw http.ResponseWriter, r *http.Request) {
-	// URL verification (GET)
+	// URL verification (GET): WeCom sends msg_signature, timestamp, nonce, echostr.
 	if r.Method == http.MethodGet {
 		echostr := r.URL.Query().Get("echostr")
+		if w.token != "" {
+			msgSig := r.URL.Query().Get("msg_signature")
+			timestamp := r.URL.Query().Get("timestamp")
+			nonce := r.URL.Query().Get("nonce")
+			if !verifyWeComSignature(w.token, timestamp, nonce, echostr, msgSig) {
+				http.Error(rw, "invalid signature", http.StatusUnauthorized)
+				return
+			}
+		}
 		if w.encodingKey != "" {
 			if decrypted, err := w.decryptMsg(echostr); err == nil {
 				fmt.Fprint(rw, string(decrypted))
@@ -196,6 +210,17 @@ func (w *WeComAdapter) handleCallback(rw http.ResponseWriter, r *http.Request) {
 	if err := xml.Unmarshal(body, &callback); err != nil {
 		http.Error(rw, "invalid xml", http.StatusBadRequest)
 		return
+	}
+
+	// Verify WeCom signature: sort([token, timestamp, nonce, encrypt]) → SHA1.
+	if w.token != "" {
+		msgSig := r.URL.Query().Get("msg_signature")
+		timestamp := r.URL.Query().Get("timestamp")
+		nonce := r.URL.Query().Get("nonce")
+		if !verifyWeComSignature(w.token, timestamp, nonce, callback.Encrypt, msgSig) {
+			http.Error(rw, "invalid signature", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	// Decrypt message if encoding key is set
@@ -230,6 +255,18 @@ func (w *WeComAdapter) handleCallback(rw http.ResponseWriter, r *http.Request) {
 
 	w.EmitMessage(event)
 	rw.WriteHeader(http.StatusOK)
+}
+
+// verifyWeComSignature validates the WeCom callback signature.
+// It sorts [token, timestamp, nonce, encrypt] lexicographically, joins them,
+// SHA1-hashes the result, and compares the hex digest with msgSignature.
+func verifyWeComSignature(token, timestamp, nonce, encrypt, msgSignature string) bool {
+	parts := []string{token, timestamp, nonce, encrypt}
+	sort.Strings(parts)
+	h := sha1.New()
+	h.Write([]byte(strings.Join(parts, "")))
+	computed := fmt.Sprintf("%x", h.Sum(nil))
+	return computed == msgSignature
 }
 
 func (w *WeComAdapter) decryptMsg(encrypted string) ([]byte, error) {

@@ -34,20 +34,38 @@ func (c *Client) Close() error { return c.rdb.Close() }
 // --- Session Lock (Distributed) ---
 
 // AcquireSessionLock attempts to acquire a distributed lock for a session.
-func (c *Client) AcquireSessionLock(ctx context.Context, tenantID, sessionID string, ttl time.Duration) (bool, error) {
+// Returns the lock token (for owner-verified release) and whether acquisition succeeded.
+func (c *Client) AcquireSessionLock(ctx context.Context, tenantID, sessionID string, ttl time.Duration) (string, bool, error) {
 	key := fmt.Sprintf("lock:session:%s:%s", tenantID, sessionID)
-	return c.rdb.SetNX(ctx, key, "locked", ttl).Result()
+	token := fmt.Sprintf("%d", time.Now().UnixNano())
+	ok, err := c.rdb.SetNX(ctx, key, token, ttl).Result()
+	return token, ok, err
 }
 
-// ReleaseSessionLock releases a session lock.
-func (c *Client) ReleaseSessionLock(ctx context.Context, tenantID, sessionID string) error {
+// releaseScript is a Lua script that only deletes the lock if the caller owns it.
+var releaseScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+else
+	return 0
+end
+`)
+
+// ReleaseSessionLock releases a session lock only if the caller holds it (owner-verified).
+func (c *Client) ReleaseSessionLock(ctx context.Context, tenantID, sessionID, token string) error {
 	key := fmt.Sprintf("lock:session:%s:%s", tenantID, sessionID)
-	return c.rdb.Del(ctx, key).Err()
+	_, err := releaseScript.Run(ctx, c.rdb, []string{key}, token).Result()
+	return err
 }
 
-// ExtendSessionLock extends the TTL of a session lock.
-func (c *Client) ExtendSessionLock(ctx context.Context, tenantID, sessionID string, ttl time.Duration) error {
+// ExtendSessionLock extends the TTL of a session lock only if the caller holds it.
+func (c *Client) ExtendSessionLock(ctx context.Context, tenantID, sessionID, token string, ttl time.Duration) error {
 	key := fmt.Sprintf("lock:session:%s:%s", tenantID, sessionID)
+	// Verify ownership before extending
+	val, err := c.rdb.Get(ctx, key).Result()
+	if err != nil || val != token {
+		return fmt.Errorf("lock not owned by this token")
+	}
 	return c.rdb.Expire(ctx, key, ttl).Err()
 }
 
@@ -62,7 +80,7 @@ func (c *Client) CheckRateLimit(ctx context.Context, tenantID, userID string, wi
 	pipe.Expire(ctx, key, window)
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		return true, 0, err // fail open
+		return false, 0, err // fail closed
 	}
 
 	count := incr.Val()

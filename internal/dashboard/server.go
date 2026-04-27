@@ -16,15 +16,16 @@ var staticFS embed.FS
 
 // Dashboard serves the web management interface.
 type Dashboard struct {
-	port   int
-	server *http.Server
+	port           int
+	DashboardToken string // Bearer token for write endpoints; empty = dev mode (no auth)
+	server         *http.Server
 
 	// Handlers for data endpoints
-	GetSessions  func() (any, error)
-	GetConfig    func() (any, error)
-	GetSkills    func() (any, error)
-	GetGateways  func() (any, error)
-	SaveConfig   func(data map[string]any) error
+	GetSessions func() (any, error)
+	GetConfig   func() (any, error)
+	GetSkills   func() (any, error)
+	GetGateways func() (any, error)
+	SaveConfig  func(data map[string]any) error
 }
 
 // New creates a dashboard on the given port.
@@ -54,7 +55,7 @@ func (d *Dashboard) Start() error {
 
 	d.server = &http.Server{
 		Addr:         fmt.Sprintf("127.0.0.1:%d", d.port),
-		Handler:      withDashboardCORS(mux),
+		Handler:      withDashboardCORS(d.port, mux),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
@@ -98,6 +99,13 @@ func (d *Dashboard) handleConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodPost && d.SaveConfig != nil {
+		if d.DashboardToken != "" {
+			auth := r.Header.Get("Authorization")
+			if auth != "Bearer "+d.DashboardToken {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
 		var data map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -151,11 +159,15 @@ func (d *Dashboard) handleGateways(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func withDashboardCORS(next http.Handler) http.Handler {
+func withDashboardCORS(port int, next http.Handler) http.Handler {
+	allowed := fmt.Sprintf("http://localhost:%d", port)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		origin := r.Header.Get("Origin")
+		if origin == allowed {
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		}
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return

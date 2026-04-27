@@ -537,6 +537,17 @@ func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
 		wg.Add(1)
 		go func(idx int, call llm.ToolCall) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("Tool panicked", "tool", call.Function.Name, "panic", r)
+					resultCh <- indexedResult{index: idx, msg: llm.Message{
+						Role:       "tool",
+						Content:    fmt.Sprintf(`{"error":"tool panicked: %v"}`, r),
+						ToolCallID: call.ID,
+						ToolName:   call.Function.Name,
+					}}
+				}
+			}()
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()

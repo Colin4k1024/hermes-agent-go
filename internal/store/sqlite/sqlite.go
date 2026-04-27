@@ -9,6 +9,16 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
 
+func init() {
+	store.RegisterDriver("sqlite", func(ctx context.Context, cfg store.StoreConfig) (store.Store, error) {
+		url := cfg.URL
+		if url == "" {
+			url = ""
+		}
+		return New(url)
+	})
+}
+
 // SQLiteStore wraps the existing state.SessionDB as a store.Store for local dev.
 type SQLiteStore struct {
 	db *state.SessionDB

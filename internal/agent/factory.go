@@ -71,14 +71,21 @@ func (f *AgentFactory) Run(ctx context.Context, req ChatRequest) (*ChatResult, e
 	sessionID := req.SessionID
 
 	// Acquire session lock if Redis available
+	var lockToken string
 	if f.redis != nil {
-		acquired, err := f.redis.AcquireSessionLock(ctx, tenantID, sessionID, 30*time.Second)
+		token, acquired, err := f.redis.AcquireSessionLock(ctx, tenantID, sessionID, 30*time.Second)
 		if err != nil {
 			slog.Warn("Failed to acquire session lock", "error", err)
 		} else if !acquired {
 			return nil, fmt.Errorf("session %s is being processed by another instance", sessionID)
+		} else {
+			lockToken = token
 		}
-		defer f.redis.ReleaseSessionLock(ctx, tenantID, sessionID)
+		defer func() {
+			if lockToken != "" {
+				f.redis.ReleaseSessionLock(ctx, tenantID, sessionID, lockToken)
+			}
+		}()
 	}
 
 	// Load context: recent messages from store
@@ -92,12 +99,14 @@ func (f *AgentFactory) Run(ctx context.Context, req ChatRequest) (*ChatResult, e
 	messages = append(messages, userMsg)
 
 	// Persist user message
-	f.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
+	if _, appendErr := f.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
 		SessionID: sessionID,
 		Role:      "user",
 		Content:   req.Text,
 		Timestamp: time.Now(),
-	})
+	}); appendErr != nil {
+		return nil, fmt.Errorf("persist user message: %w", appendErr)
+	}
 
 	// Create temporary agent and run
 	ag, agErr := New(

@@ -8,6 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func init() {
+	store.RegisterDriver("postgres", func(ctx context.Context, cfg store.StoreConfig) (store.Store, error) {
+		return New(ctx, cfg.URL)
+	})
+}
+
 // PGStore implements store.Store backed by PostgreSQL.
 type PGStore struct {
 	pool     *pgxpool.Pool
