@@ -141,24 +141,16 @@ func Load() *Config {
 	configOnce.Do(func() {
 		globalConfig = DefaultConfig()
 
-		// Load .env file
-		envPath := filepath.Join(HermesHome(), ".env")
-		_ = godotenv.Load(envPath)
+		// Load .env file (optional)
+		_ = godotenv.Load(filepath.Join(HermesHome(), ".env"))
 
-		// Load config.yaml
-		configPath := filepath.Join(HermesHome(), "config.yaml")
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return
+		// Load config.yaml (optional) — merge over defaults
+		if data, err := os.ReadFile(filepath.Join(HermesHome(), "config.yaml")); err == nil {
+			var fileConfig Config
+			if err := yaml.Unmarshal(data, &fileConfig); err == nil {
+				mergeConfig(globalConfig, &fileConfig)
+			}
 		}
-
-		var fileConfig Config
-		if err := yaml.Unmarshal(data, &fileConfig); err != nil {
-			return
-		}
-
-		// Merge file config over defaults
-		mergeConfig(globalConfig, &fileConfig)
 
 		// Env var overrides (highest priority)
 		applyEnvOverrides(globalConfig)

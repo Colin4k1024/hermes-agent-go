@@ -1,0 +1,16 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git curl ripgrep jq python3 python3-pip ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash hermes
+
+COPY hermes-linux-amd64 /usr/local/bin/hermes
+RUN chmod +x /usr/local/bin/hermes
+
+USER hermes
+WORKDIR /home/hermes
+
+ENTRYPOINT ["hermes"]
+CMD ["gateway", "start"]

@@ -43,9 +43,17 @@ func (a *APIServerAdapter) Connect(ctx context.Context) error {
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+	})
+	mux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
+	})
 
 	a.server = &http.Server{
-		Addr:         fmt.Sprintf("127.0.0.1:%d", a.port),
+		Addr:         fmt.Sprintf("0.0.0.0:%d", a.port),
 		Handler:      mux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 300 * time.Second,
