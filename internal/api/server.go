@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
@@ -15,18 +17,64 @@ import (
 
 // APIServerConfig holds all dependencies for the SaaS API server.
 type APIServerConfig struct {
-	Port      int
-	Store     store.Store
-	DB        DBPinger // optional; nil disables readiness DB check
-	AuthChain *auth.ExtractorChain
-	RBAC      middleware.RBACConfig
-	RateLimit middleware.RateLimitConfig
+	Port          int
+	Store         store.Store
+	DB            DBPinger // optional; nil disables readiness DB check
+	AuthChain     *auth.ExtractorChain
+	RBAC          middleware.RBACConfig
+	RateLimit     middleware.RateLimitConfig
+	AllowedOrigins string // comma-separated list of allowed origins, or "*" for all
+	StaticDir    string  // directory to serve static files from (optional)
 }
 
 // APIServer is the multi-tenant SaaS API HTTP server.
 type APIServer struct {
 	cfg    APIServerConfig
 	server *http.Server
+}
+
+// spaFallback wraps the API mux: serves index.html for root "/" and admin.html,
+// delegates all other paths to the inner mux. This avoids ServeMux conflicts
+// between "/" and "/v1/" patterns.
+func spaFallback(mux, spa http.Handler, staticDir string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" {
+			http.ServeFile(w, r, staticDir+"/index.html")
+			return
+		}
+		if path == "/admin.html" || path == "/index.html" {
+			http.ServeFile(w, r, staticDir+path)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
+// corsMiddleware returns an HTTP handler that adds CORS headers.
+func corsMiddleware(next http.Handler, origins string) http.Handler {
+	allowAll := origins == "*"
+	allowed := make(map[string]bool)
+	for _, o := range strings.Split(origins, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			allowed[o] = true
+		}
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" && (allowAll || allowed[origin]) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Hermes-Session-Id")
+		}
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // NewAPIServer creates and configures the API server with all routes and middleware.
@@ -60,17 +108,47 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	api.Handle("/v1/usage", NewUsageHandler(cfg.Store.Sessions(), cfg.Store.Messages()))
 	api.HandleFunc("GET /v1/openapi", OpenAPISpec())
 
+	me := NewMeHandler(cfg.Store)
+	api.Handle("/v1/me", me)
+
 	gdpr := NewGDPRHandler(cfg.Store.Sessions(), cfg.Store.Messages())
 	api.HandleFunc("GET /v1/gdpr/export", gdpr.ExportHandler())
 	api.HandleFunc("DELETE /v1/gdpr/data", gdpr.DeleteHandler())
 
 	mux.Handle("/v1/", auditMW(stack.Wrap(api)))
 
+	// Static file serving (optional).
+	var spaHandler http.Handler
+	if cfg.StaticDir != "" {
+		if _, err := os.Stat(cfg.StaticDir); err == nil {
+			spaHandler = http.FileServer(http.Dir(cfg.StaticDir))
+			// Strip /static/ prefix.
+			mux.Handle("/static/", http.StripPrefix("/static/", spaHandler))
+			slog.Info("Serving static files", "dir", cfg.StaticDir)
+		} else {
+			slog.Warn("Static directory not found, skipping static file serving", "dir", cfg.StaticDir)
+		}
+	}
+
+	var handler http.Handler = mux
+
+	// Wrap mux with SPA fallback: serve index.html for root, else pass through to mux.
+	// Done outside mux to avoid ServeMux path conflict between "/" and "/v1/".
+	if spaHandler != nil {
+		handler = spaFallback(handler, spaHandler, cfg.StaticDir)
+	}
+
+	// Apply CORS if configured.
+	if cfg.AllowedOrigins != "" {
+		handler = corsMiddleware(handler, cfg.AllowedOrigins)
+		slog.Info("CORS enabled", "origins", cfg.AllowedOrigins)
+	}
+
 	s := &APIServer{
 		cfg: cfg,
 		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", cfg.Port),
-			Handler:      mux,
+			Addr:         fmt.Sprintf("0.0.0.0:%d", cfg.Port),
+			Handler:      handler,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  120 * time.Second,

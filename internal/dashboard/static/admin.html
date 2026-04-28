@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes SaaS Admin</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #0d1117;
+  --sidebar-bg: #161b22;
+  --card-bg: #161b22;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font-family: inherit; }
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  position: fixed; left: 0; top: 0; width: 220px; height: 100vh;
+  background: var(--sidebar-bg); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.sidebar-logo {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px; font-weight: 700; color: var(--accent);
+  display: flex; align-items: center; gap: 8px;
+}
+.sidebar-logo span { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.sidebar nav { flex: 1; padding: 12px 0; }
+.sidebar nav a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 14px; border-left: 3px solid transparent;
+}
+.sidebar nav a:hover { color: var(--text); background: #21262d; }
+.sidebar nav a.active { color: var(--text); background: #21262d; border-left-color: var(--accent); }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+.sidebar-footer .user-info { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.sidebar-footer button {
+  width: 100%; padding: 6px 12px; border-radius: 6px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); font-size: 13px;
+}
+.sidebar-footer button:hover { background: #21262d; color: var(--text); }
+
+/* ── Main ────────────────────────────────────────────────── */
+.main { margin-left: 220px; padding: 28px 32px; min-height: 100vh; }
+
+/* ── Page header ─────────────────────────────────────────── */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-header h1 { font-size: 20px; font-weight: 600; }
+.page-header .subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; margin-bottom: 16px;
+}
+.card h2 { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 14px; }
+
+/* ── Stats grid ──────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px 20px;
+}
+.stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-card .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+.stat-card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Status badges ────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
+}
+.badge-ok    { background: rgba(63,185,80,0.15); color: var(--success); border: 1px solid rgba(63,185,80,0.3); }
+.badge-warn  { background: rgba(210,153,34,0.15); color: var(--warning); border: 1px solid rgba(210,153,34,0.3); }
+.badge-error { background: rgba(248,81,73,0.15); color: var(--danger); border: 1px solid rgba(248,81,73,0.3); }
+.badge-info  { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+
+/* ── Tables ──────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #21262d; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #1c2128; }
+.mono { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; transition: background 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #4393e6; }
+.btn-danger { background: rgba(248,81,73,0.1); color: var(--danger); border-color: rgba(248,81,73,0.3); }
+.btn-danger:hover { background: rgba(248,81,73,0.2); }
+.btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+.btn-ghost:hover { background: #21262d; color: var(--text); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Forms ───────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.form-group input, .form-group select {
+  width: 100%; padding: 8px 12px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  font-size: 14px; font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Modal ───────────────────────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 100; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 24px; width: 480px; max-width: 90vw;
+}
+.modal h3 { font-size: 16px; margin-bottom: 16px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ── Login ───────────────────────────────────────────────── */
+.login-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+}
+.login-box {
+  width: 400px; max-width: 90vw;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 36px;
+}
+.login-box h1 { font-size: 22px; margin-bottom: 6px; }
+.login-box .tagline { color: var(--text-muted); font-size: 14px; margin-bottom: 28px; }
+.login-box .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.login-box .hint code { color: var(--accent); font-family: 'SF Mono', monospace; }
+
+/* ── Alert ───────────────────────────────────────────────── */
+.alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; }
+.alert-error { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); color: var(--danger); }
+.alert-success { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); color: var(--success); }
+
+/* ── Key display ─────────────────────────────────────────── */
+.key-display {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; font-family: 'SF Mono', monospace; font-size: 13px;
+  word-break: break-all; margin: 8px 0;
+}
+.key-display .copy-btn { float: right; }
+
+/* ── Empty state ─────────────────────────────────────────── */
+.empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+.empty-state p { margin-top: 8px; font-size: 14px; }
+
+/* ── Loading spinner ─────────────────────────────────────── */
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tab bar ──────────────────────────────────────────────── */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+.tab-bar button {
+  padding: 8px 16px; background: transparent; border: none; color: var(--text-muted);
+  font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  border-radius: 4px 4px 0 0;
+}
+.tab-bar button:hover { color: var(--text); }
+.tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.pagination .info { font-size: 13px; color: var(--text-muted); }
+.pagination .controls { display: flex; gap: 6px; }
+
+/* ── Token count chip ────────────────────────────────────── */
+.token-chip {
+  display: inline-flex; flex-direction: column; align-items: center;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 20px; text-align: center;
+}
+.token-chip .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+.token-chip .count { font-size: 20px; font-weight: 700; margin-top: 4px; font-family: 'SF Mono', monospace; }
+
+/* ── JSON viewer ─────────────────────────────────────────── */
+.json-viewer { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-family: 'SF Mono', monospace; font-size: 12px; overflow-x: auto; white-space: pre; }
+
+/* ── Loading overlay ─────────────────────────────────────── */
+.loading-overlay { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.hidden { display: none !important; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 16px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOGIN PAGE
+═══════════════════════════════════════════════════════════ -->
+<div id="login-page" class="login-page">
+  <div class="login-box">
+    <h1>Hermes Admin</h1>
+    <p class="tagline">Multi-tenant AI agent platform</p>
+    <div id="login-error" class="alert alert-error hidden"></div>
+    <div class="form-group">
+      <label for="api-key-input">API Key</label>
+      <input type="password" id="api-key-input" placeholder="hk_..." autocomplete="off">
+      <p class="hint">Paste your API key from <code>POST /v1/api-keys</code></p>
+    </div>
+    <div class="form-group">
+      <label for="api-base-url">API Base URL</label>
+      <input type="text" id="api-base-url" placeholder="http://localhost:8080" value="">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="handleLogin()">
+      Sign In
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN APP (shown after login)
+═══════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      Hermes
+      <span>SaaS</span>
+    </div>
+    <nav>
+      <a href="#dashboard" id="nav-dashboard">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1H4a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 5.5 5H3.5A1.5 1.5 0 0 1 2 3.5v-1zm0 6A1.5 1.5 0 0 1 2.5 8H4a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 5.5 12H3.5A1.5 1.5 0 0 1 2 10.5v-1zm8 1A1.5 1.5 0 0 1 10.5 11H12a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 13.5 15h-3a1.5 1.5 0 0 1-1.5-1.5v-1zm0-6A1.5 1.5 0 0 1 10.5 5H12a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 13.5 9h-3A1.5 1.5 0 0 1 9 7.5v-1z"/></svg>
+        Dashboard
+      </a>
+      <a href="#api-keys" id="nav-api-keys">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l2.414 2.414a.5.5 0 0 1 .146.354v.5a.5.5 0 0 1-.146.354L9.121 12.707A4.001 4.001 0 0 1 0 8zm4-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 0a6 6 0 1 0 0 12A6 6 0 0 0 8 0zM6 8a1 1 0 1 1 2 0 1 1 0 0 1-2 0z"/></svg>
+        API Keys
+      </a>
+      <a href="#usage" id="nav-usage">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M0 0h1v15h15v1H0V0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5v-4zm-3 .5c-.928 0-1.682.534-2.08 1.294A3.99 3.99 0 0 0 2 10.5V13H1v-2.5A3.5 3.5 0 0 1 4.5 7h3z"/></svg>
+        Usage
+      </a>
+      <a href="#audit" id="nav-audit">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H5z"/><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2z"/></svg>
+        Audit Logs
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info" id="user-info">Loading...</div>
+      <button onclick="handleLogout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ═══ Dashboard page ═══ -->
+    <section id="page-dashboard" class="page hidden">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="subtitle" id="dashboard-tenant-name">Loading...</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">
+          <span class="spinner hidden" id="dash-refreshing"></span>
+          Refresh
+        </button>
+      </div>
+
+      <!-- Health status -->
+      <div class="stats-grid">
+        <div class="card">
+          <h2>System Health</h2>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:13px">Liveness</span>
+              <span id="health-live-badge" class="badge">—</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:13px">Readiness</span>
+              <span id="health-ready-badge" class="badge">—</span>
+            </div>
+            <div id="health-checks" class="hidden" style="margin-top:8px;font-size:12px;color:var(--text-muted)"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Sessions</div>
+          <div class="value" id="stat-sessions">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Input Tokens</div>
+          <div class="value" id="stat-input-tokens" style="font-size:20px">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Output Tokens</div>
+          <div class="value" id="stat-output-tokens" style="font-size:20px">—</div>
+        </div>
+      </div>
+
+      <!-- Rate limits -->
+      <div class="card">
+        <h2>Rate Limits</h2>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">RPM Limit</div>
+            <div style="font-size:22px;font-weight:700;margin-top:4px" id="rate-limit-rpm">—</div>
+          </div>
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Plan</div>
+            <div style="font-size:22px;font-weight:700;margin-top:4px" id="tenant-plan">—</div>
+          </div>
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Max Sessions</div>
+            <div style="font-size:22px;font-weight:700;margin-top:4px" id="tenant-max-sessions">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent audit -->
+      <div class="card">
+        <h2>Recent Activity</h2>
+        <div id="recent-activity">
+          <div class="loading-overlay"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ API Keys page ═══ -->
+    <section id="page-api-keys" class="page hidden">
+      <div class="page-header">
+        <div>
+          <h1>API Keys</h1>
+          <p class="subtitle">Manage authentication keys for this tenant</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateKeyModal()">
+          + New API Key
+        </button>
+      </div>
+
+      <div id="api-keys-error" class="alert alert-error hidden"></div>
+      <div id="api-keys-list">
+        <div class="loading-overlay"><span class="spinner"></span></div>
+      </div>
+    </section>
+
+    <!-- ═══ Usage page ═══ -->
+    <section id="page-usage" class="page hidden">
+      <div class="page-header">
+        <div>
+          <h1>Usage</h1>
+          <p class="subtitle">Token consumption and session counts</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadUsage()">
+          <span class="spinner hidden" id="usage-refreshing"></span>
+          Refresh
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">Total Sessions</div>
+          <div class="value" id="usage-sessions">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total Input Tokens</div>
+          <div class="value" id="usage-input" style="font-size:20px">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total Output Tokens</div>
+          <div class="value" id="usage-output" style="font-size:20px">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total Tokens</div>
+          <div class="value" id="usage-total" style="font-size:20px">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Token Distribution</h2>
+        <div id="token-bars" style="display:flex;flex-direction:column;gap:14px;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:100px;font-size:13px">Input</div>
+            <div style="flex:1;height:24px;background:#21262d;border-radius:4px;overflow:hidden">
+              <div id="bar-input" style="height:100%;background:var(--accent);transition:width .3s;width:0%"></div>
+            </div>
+            <div id="bar-input-pct" style="width:60px;text-align:right;font-size:13px;font-family:monospace">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:100px;font-size:13px">Output</div>
+            <div style="flex:1;height:24px;background:#21262d;border-radius:4px;overflow:hidden">
+              <div id="bar-output" style="height:100%;background:var(--success);transition:width .3s;width:0%"></div>
+            </div>
+            <div id="bar-output-pct" style="width:60px;text-align:right;font-size:13px;font-family:monospace">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Rate Limit Configuration</h2>
+        <div id="rate-limit-detail" style="display:flex;gap:32px;flex-wrap:wrap;margin-top:4px">
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase">RPM Limit</div>
+            <div style="font-size:20px;font-weight:700;margin-top:4px" id="usage-rpm">—</div>
+          </div>
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Plan</div>
+            <div style="font-size:20px;font-weight:700;margin-top:4px" id="usage-plan">—</div>
+          </div>
+          <div>
+            <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Max Sessions</div>
+            <div style="font-size:20px;font-weight:700;margin-top:4px" id="usage-max-sessions">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Audit Logs page ═══ -->
+    <section id="page-audit" class="page hidden">
+      <div class="page-header">
+        <div>
+          <h1>Audit Logs</h1>
+          <p class="subtitle">Immutable activity trail for this tenant</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="audit-action-filter" onchange="loadAudit(0)" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:13px">
+            <option value="">All actions</option>
+            <option value="session.create">session.create</option>
+            <option value="session.delete">session.delete</option>
+            <option value="auth.login">auth.login</option>
+            <option value="auth.failure">auth.failure</option>
+            <option value="tenant.create">tenant.create</option>
+            <option value="tenant.update">tenant.update</option>
+            <option value="tenant.delete">tenant.delete</option>
+            <option value="apikey.create">apikey.create</option>
+            <option value="apikey.revoke">apikey.revoke</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAudit(0)">
+            <span class="spinner hidden" id="audit-refreshing"></span>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="audit-error" class="alert alert-error hidden"></div>
+      <div class="card">
+        <div id="audit-table">
+          <div class="loading-overlay"><span class="spinner"></span></div>
+        </div>
+        <div class="pagination" id="audit-pagination"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CREATE API KEY MODAL
+═══════════════════════════════════════════════════════════ -->
+<div id="modal-create-key" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-create-key')">
+  <div class="modal">
+    <h3>Create API Key</h3>
+    <div class="form-group">
+      <label for="key-name">Key Name</label>
+      <input type="text" id="key-name" placeholder="e.g. Production Key">
+    </div>
+    <div class="form-group">
+      <label for="key-roles">Roles</label>
+      <select id="key-roles" multiple style="height:80px">
+        <option value="user" selected>user</option>
+        <option value="operator">operator</option>
+        <option value="admin">admin</option>
+      </select>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Hold Ctrl/Cmd to select multiple</p>
+    </div>
+    <div id="new-key-display" class="key-display hidden"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-key')">Cancel</button>
+      <button class="btn btn-primary" id="btn-create-key" onclick="handleCreateKey()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CONFIRM REVOKE MODAL
+═══════════════════════════════════════════════════════════ -->
+<div id="modal-revoke-key" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-revoke-key')">
+  <div class="modal">
+    <h3>Revoke API Key</h3>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:8px">This action cannot be undone. Any systems using this key will immediately lose access.</p>
+    <div id="revoke-key-info" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:13px;margin-bottom:16px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-revoke-key')">Cancel</button>
+      <button class="btn btn-danger" id="btn-revoke-key" onclick="handleRevokeKey()">Revoke</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     NEW KEY RESULT MODAL
+═══════════════════════════════════════════════════════════ -->
+<div id="modal-key-result" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-key-result')">
+  <div class="modal">
+    <h3>API Key Created</h3>
+    <p style="font-size:14px;color:var(--warning);margin-bottom:8px">
+      Save this key now — it will not be shown again.
+    </p>
+    <div id="result-key-display" class="key-display"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="copyKey()">Copy to Clipboard</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-key-result')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────────────────
+let _cfg = { baseUrl: '', apiKey: '' };
+let _me = null; // { tenant_id, roles, auth_method }
+let _auditPage = 0;
+const _auditLimit = 20;
+let _pendingRevokeId = null;
+let _pendingRevokeName = null;
+
+// ─────────────────────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────────────────────
+(function init() {
+  const savedKey = localStorage.getItem('hermes_api_key') || '';
+  const savedUrl = localStorage.getItem('hermes_api_url') || 'http://localhost:8080';
+  document.getElementById('api-key-input').value = savedKey;
+  document.getElementById('api-base-url').value = savedUrl;
+
+  if (savedKey) {
+    _cfg.apiKey = savedKey;
+    _cfg.baseUrl = savedUrl;
+    showApp();
+  }
+
+  window.addEventListener('hashchange', onHashChange);
+  onHashChange();
+})();
+
+function onHashChange() {
+  const hash = location.hash || '#dashboard';
+  const page = hash.replace('#', '') || 'dashboard';
+
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+
+  const pageEl = document.getElementById('page-' + page);
+  const navEl = document.getElementById('nav-' + page);
+
+  if (!pageEl) {
+    navigateTo('dashboard');
+    return;
+  }
+  pageEl.classList.remove('hidden');
+  if (navEl) navEl.classList.add('active');
+
+  // Load page data
+  if (page === 'dashboard') loadDashboard();
+  else if (page === 'api-keys') loadAPIKeys();
+  else if (page === 'usage') loadUsage();
+  else if (page === 'audit') loadAudit(0);
+}
+
+function navigateTo(page) { location.hash = page; }
+
+function showApp() {
+  document.getElementById('login-page').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  loadMe();
+}
+
+function showLogin() {
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-page').classList.remove('hidden');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Auth
+// ─────────────────────────────────────────────────────────────
+async function handleLogin() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const url = document.getElementById('api-base-url').value.trim().replace(/\/$/, '');
+
+  if (!key) { showLoginError('Please enter an API key.'); return; }
+  if (!url) { showLoginError('Please enter an API base URL.'); return; }
+
+  _cfg.apiKey = key;
+  _cfg.baseUrl = url;
+  localStorage.setItem('hermes_api_key', key);
+  localStorage.setItem('hermes_api_url', url);
+
+  // Test connection by fetching /v1/me
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  try {
+    const me = await api('/v1/me');
+    _me = me;
+    showApp();
+    onHashChange();
+  } catch (e) {
+    showLoginError('Authentication failed: ' + (e.message || 'Invalid API key or server unreachable.'));
+    localStorage.removeItem('hermes_api_key');
+    _cfg.apiKey = '';
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('hermes_api_key');
+  _cfg.apiKey = '';
+  _me = null;
+  showLogin();
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+async function loadMe() {
+  try {
+    _me = await api('/v1/me');
+    const roles = (_me.roles || []).join(', ');
+    document.getElementById('user-info').textContent = 'Tenant: ' + _me.tenant_id + (roles ? ' · ' + roles : '');
+  } catch {
+    document.getElementById('user-info').textContent = 'Unknown tenant';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  API helper
+// ─────────────────────────────────────────────────────────────
+async function api(path, options = {}) {
+  const url = _cfg.baseUrl + path;
+  const headers = { 'Content-Type': 'application/json' };
+  if (_cfg.apiKey) headers['Authorization'] = 'Bearer ' + _cfg.apiKey;
+
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 204) return {};
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = body.error?.message || body.message || body.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return body;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Dashboard
+// ─────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const spinner = document.getElementById('dash-refreshing');
+  spinner.classList.remove('hidden');
+
+  try {
+    const [live, ready, me, usage, audit] = await Promise.allSettled([
+      api('/health/live'),
+      api('/health/ready'),
+      api('/v1/me'),
+      api('/v1/usage'),
+      api('/v1/audit-logs?limit=5'),
+    ]);
+
+    // Health
+    if (live.status === 'fulfilled') {
+      setBadge('health-live-badge', live.value?.status === 'alive', 'alive', 'dead');
+    }
+    if (ready.status === 'fulfilled') {
+      const r = ready.value;
+      const isReady = r?.status === 'ready';
+      setBadge('health-ready-badge', isReady, 'ready', 'not ready');
+      const checksEl = document.getElementById('health-checks');
+      if (r && Object.keys(r).length > 1) {
+        checksEl.classList.remove('hidden');
+        checksEl.innerHTML = Object.entries(r)
+          .filter(([k]) => k !== 'status')
+          .map(([k, v]) => `<div style="display:flex;justify-content:space-between"><span>${k}</span><span>${v}</span></div>`)
+          .join('');
+      }
+    } else {
+      setBadge('health-ready-badge', false, 'unreachable', 'dead');
+    }
+
+    // Usage
+    if (usage.status === 'fulfilled') {
+      document.getElementById('stat-sessions').textContent = usage.value.total_sessions ?? '—';
+      document.getElementById('stat-input-tokens').textContent = fmt(usage.value.total_input_tokens ?? 0);
+      document.getElementById('stat-output-tokens').textContent = fmt(usage.value.total_output_tokens ?? 0);
+    }
+
+    // Tenant info
+    if (me.status === 'fulfilled') {
+      document.getElementById('dashboard-tenant-name').textContent = 'Tenant: ' + me.value.tenant_id;
+      document.getElementById('rate-limit-rpm').textContent = me.value.rate_limit_rpm ?? '—';
+      document.getElementById('tenant-plan').textContent = me.value.plan ?? '—';
+      document.getElementById('tenant-max-sessions').textContent = me.value.max_sessions ?? '—';
+    }
+
+    // Recent activity
+    const actEl = document.getElementById('recent-activity');
+    if (audit.status === 'fulfilled' && audit.value.audit_logs?.length) {
+      actEl.innerHTML = renderAuditTable(audit.value.audit_logs.slice(0, 5), false);
+    } else if (audit.status === 'fulfilled') {
+      actEl.innerHTML = '<div class="empty-state"><p>No recent activity</p></div>';
+    } else {
+      actEl.innerHTML = '<div class="empty-state"><p>Could not load activity</p></div>';
+    }
+
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function setBadge(id, ok, okText, failText) {
+  const el = document.getElementById(id);
+  el.textContent = ok ? okText : failText;
+  el.className = 'badge ' + (ok ? 'badge-ok' : 'badge-error');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  API Keys
+// ─────────────────────────────────────────────────────────────
+async function loadAPIKeys() {
+  const el = document.getElementById('api-keys-list');
+  const errEl = document.getElementById('api-keys-error');
+  errEl.classList.add('hidden');
+
+  try {
+    const data = await api('/v1/api-keys');
+    const keys = data.api_keys || [];
+
+    if (!keys.length) {
+      el.innerHTML = '<div class="card"><div class="empty-state"><p>No API keys yet. Create one to get started.</p></div></div>';
+      return;
+    }
+
+    el.innerHTML = '<div class="card"><h2>API Keys</h2><table><thead><tr><th>Name</th><th>Prefix</th><th>Roles</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>' +
+      keys.map(k => {
+        const active = !k.revoked_at;
+        const roles = (k.roles || []).map(r =>
+          r === 'admin' ? '<span class="badge badge-error">' + r + '</span>' :
+          r === 'operator' ? '<span class="badge badge-warn">' + r + '</span>' :
+          '<span class="badge badge-info">' + r + '</span>'
+        ).join(' ');
+        return '<tr>' +
+          '<td><span class="mono">' + escHtml(k.name || '—') + '</span></td>' +
+          '<td><span class="mono">' + escHtml(k.prefix || '—') + '</span></td>' +
+          '<td>' + roles + '</td>' +
+          '<td>' + fmtDate(k.created_at) + '</td>' +
+          '<td>' + (active ?
+            '<span class="badge badge-ok">active</span>' :
+            '<span class="badge badge-error">revoked</span>') + '</td>' +
+          '<td style="text-align:right">' +
+            (active ? '<button class="btn btn-danger btn-sm" onclick="openRevokeModal(\'' + k.id + '\',\'' + escAttr(k.name) + '\')">Revoke</button>' : '') +
+          '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+    el.innerHTML = '';
+  }
+}
+
+function openCreateKeyModal() {
+  document.getElementById('key-name').value = '';
+  // Multi-select: set option.selected instead of .value = ['user'] (browser-compatible).
+  const select = document.getElementById('key-roles');
+  Array.from(select.options).forEach(o => { o.selected = o.value === 'user'; });
+  document.getElementById('new-key-display').classList.add('hidden');
+  document.getElementById('btn-create-key').disabled = false;
+  openModal('modal-create-key');
+}
+
+async function handleCreateKey() {
+  const name = document.getElementById('key-name').value.trim();
+  if (!name) { alert('Please enter a key name.'); return; }
+
+  const select = document.getElementById('key-roles');
+  const roles = Array.from(select.selectedOptions).map(o => o.value);
+
+  const btn = document.getElementById('btn-create-key');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    const result = await api('/v1/api-keys', {
+      method: 'POST',
+      body: JSON.stringify({ name, roles }),
+    });
+
+    // Show the raw key once
+    document.getElementById('result-key-display').textContent = result.key || result.RawKey || '—';
+    closeModal('modal-create-key');
+    openModal('modal-key-result');
+
+    loadAPIKeys();
+  } catch (e) {
+    alert('Failed to create key: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create';
+  }
+}
+
+function openRevokeModal(id, name) {
+  _pendingRevokeId = id;
+  _pendingRevokeName = name;
+  document.getElementById('revoke-key-info').textContent = 'Key: ' + name + ' (ID: ' + id + ')';
+  document.getElementById('btn-revoke-key').disabled = false;
+  openModal('modal-revoke-key');
+}
+
+async function handleRevokeKey() {
+  if (!_pendingRevokeId) return;
+  const btn = document.getElementById('btn-revoke-key');
+  btn.disabled = true;
+  btn.textContent = 'Revoking...';
+
+  try {
+    await api('/v1/api-keys/' + _pendingRevokeId, { method: 'DELETE' });
+    closeModal('modal-revoke-key');
+    loadAPIKeys();
+  } catch (e) {
+    alert('Failed to revoke key: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Revoke';
+  }
+}
+
+function copyKey() {
+  const text = document.getElementById('result-key-display').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Usage
+// ─────────────────────────────────────────────────────────────
+async function loadUsage() {
+  const spinner = document.getElementById('usage-refreshing');
+  spinner.classList.remove('hidden');
+
+  try {
+    const [usageData, me] = await Promise.allSettled([
+      api('/v1/usage'),
+      api('/v1/me'),
+    ]);
+
+    if (usageData.status === 'fulfilled') {
+      const u = usageData.value;
+      const total = (u.total_input_tokens || 0) + (u.total_output_tokens || 0);
+      document.getElementById('usage-sessions').textContent = u.total_sessions ?? '—';
+      document.getElementById('usage-input').textContent = fmt(u.total_input_tokens || 0);
+      document.getElementById('usage-output').textContent = fmt(u.total_output_tokens || 0);
+      document.getElementById('usage-total').textContent = fmt(total);
+
+      if (total > 0) {
+        const inputPct = Math.round((u.total_input_tokens / total) * 100);
+        const outputPct = 100 - inputPct;
+        document.getElementById('bar-input').style.width = inputPct + '%';
+        document.getElementById('bar-input-pct').textContent = inputPct + '%';
+        document.getElementById('bar-output').style.width = outputPct + '%';
+        document.getElementById('bar-output-pct').textContent = outputPct + '%';
+      }
+    }
+
+    if (me.status === 'fulfilled') {
+      document.getElementById('usage-rpm').textContent = me.value.rate_limit_rpm ?? '—';
+      document.getElementById('usage-plan').textContent = me.value.plan ?? '—';
+      document.getElementById('usage-max-sessions').textContent = me.value.max_sessions ?? '—';
+    }
+
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Audit Logs
+// ─────────────────────────────────────────────────────────────
+async function loadAudit(offset) {
+  _auditPage = offset;
+  const spinner = document.getElementById('audit-refreshing');
+  const errEl = document.getElementById('audit-error');
+  const tableEl = document.getElementById('audit-table');
+  const actionFilter = document.getElementById('audit-action-filter').value;
+
+  spinner.classList.remove('hidden');
+  errEl.classList.add('hidden');
+
+  try {
+    const params = new URLSearchParams({ limit: _auditLimit, offset });
+    if (actionFilter) params.set('action', actionFilter);
+
+    const data = await api('/v1/audit-logs?' + params.toString());
+    const logs = data.audit_logs || [];
+    const total = data.total || 0;
+
+    if (!logs.length) {
+      tableEl.innerHTML = '<div class="empty-state"><p>No audit logs found</p></div>';
+    } else {
+      tableEl.innerHTML = renderAuditTable(logs, true);
+    }
+
+    // Pagination
+    const totalPages = Math.ceil(total / _auditLimit);
+    const currentPage = Math.floor(offset / _auditLimit) + 1;
+    const pgEl = document.getElementById('audit-pagination');
+    pgEl.innerHTML =
+      '<div class="info">Showing ' + (offset + 1) + '–' + Math.min(offset + _auditLimit, total) + ' of ' + total + '</div>' +
+      '<div class="controls">' +
+        '<button class="btn btn-ghost btn-sm" onclick="loadAudit(' + Math.max(0, offset - _auditLimit) + ')" ' + (offset === 0 ? 'disabled' : '') + '>Previous</button>' +
+        '<span style="padding:4px 12px;font-size:13px;color:var(--text-muted)">' + currentPage + '/' + totalPages + '</span>' +
+        '<button class="btn btn-ghost btn-sm" onclick="loadAudit(' + (offset + _auditLimit) + ')" ' + (offset + _auditLimit >= total ? 'disabled' : '') + '>Next</button>' +
+      '</div>';
+
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+    tableEl.innerHTML = '';
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function renderAuditTable(logs, showTenant) {
+  return '<table><thead><tr>' +
+    (showTenant ? '<th>Tenant</th>' : '') +
+    '<th>Action</th><th>User</th><th>Session</th><th>Detail</th><th>Time</th>' +
+  '</tr></thead><tbody>' +
+    logs.map(l => {
+      const actionColor = l.action?.includes('failure') ? 'var(--danger)' :
+                         l.action?.includes('revoke') || l.action?.includes('delete') ? 'var(--warning)' :
+                         l.action?.includes('create') ? 'var(--success)' : 'var(--text-muted)';
+      return '<tr>' +
+        (showTenant ? '<td class="mono">' + escHtml(l.tenant_id || '—') + '</td>' : '') +
+        '<td><span class="mono" style="color:' + actionColor + '">' + escHtml(l.action || '—') + '</span></td>' +
+        '<td class="mono">' + escHtml(l.user_id || '—') + '</td>' +
+        '<td class="mono">' + escHtml(l.session_id ? l.session_id.substring(0, 8) + '…' : '—') + '</td>' +
+        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escAttr(l.detail || '') + '">' + escHtml(l.detail || '—') + '</td>' +
+        '<td style="white-space:nowrap">' + fmtDate(l.created_at) + '</td>' +
+      '</tr>';
+    }).join('') +
+  '</tbody></table>';
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Utilities
+// ─────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  try {
+    return new Date(ts).toLocaleString();
+  } catch { return ts; }
+}
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/"/g, '&quot;');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Enter key on login
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('api-key-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleLogin();
+  });
+});
+</script>
+</body>
+</html>
