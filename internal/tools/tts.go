@@ -123,9 +123,9 @@ func handleTextToSpeech(args map[string]any, ctx *ToolContext) string {
 			errMsg = "TTS generation timed out"
 		}
 		return toJSON(map[string]any{
-			"error":   fmt.Sprintf("TTS failed: %v", err),
-			"stderr":  truncateOutput(errMsg, 500),
-			"hint":    "Ensure edge-tts is installed: pip install edge-tts",
+			"error":  fmt.Sprintf("TTS failed: %v", err),
+			"stderr": truncateOutput(errMsg, 500),
+			"hint":   "Ensure edge-tts is installed: pip install edge-tts",
 		})
 	}
 

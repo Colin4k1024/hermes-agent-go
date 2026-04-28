@@ -47,10 +47,10 @@ You can search past conversations using the session_search tool.
 Use it when the user references previous work or asks "what did we do before?"`
 
 var platformHints = map[string]string{
-	"cli": `You are running in an interactive CLI terminal. The user can see your responses in real-time with streaming. You can use rich formatting (markdown, code blocks). The user can interrupt you with Ctrl+C.`,
+	"cli":      `You are running in an interactive CLI terminal. The user can see your responses in real-time with streaming. You can use rich formatting (markdown, code blocks). The user can interrupt you with Ctrl+C.`,
 	"telegram": `You are running as a Telegram bot. Keep responses concise — long messages may be split. Use markdown formatting sparingly. The user can send photos and voice messages.`,
-	"discord": `You are running as a Discord bot. Use Discord-compatible markdown. Responses over 2000 characters will be split. The user can send images and files.`,
-	"slack": `You are running as a Slack bot. Use Slack mrkdwn formatting. Keep responses focused and well-structured.`,
+	"discord":  `You are running as a Discord bot. Use Discord-compatible markdown. Responses over 2000 characters will be split. The user can send images and files.`,
+	"slack":    `You are running as a Slack bot. Use Slack mrkdwn formatting. Keep responses focused and well-structured.`,
 }
 
 func (a *AIAgent) buildSystemPrompt() string {

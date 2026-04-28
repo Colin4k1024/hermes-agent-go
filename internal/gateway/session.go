@@ -42,13 +42,13 @@ type SessionEntry struct {
 
 // SessionStore manages per-chat session tracking and persistence.
 type SessionStore struct {
-	mu           sync.Mutex
-	entries      map[string]*SessionEntry
-	sessionsDir  string
-	loaded       bool
-	db           *state.SessionDB
-	gatewayCfg   *GatewayConfig
-	idleTimeout  time.Duration
+	mu          sync.Mutex
+	entries     map[string]*SessionEntry
+	sessionsDir string
+	loaded      bool
+	db          *state.SessionDB
+	gatewayCfg  *GatewayConfig
+	idleTimeout time.Duration
 }
 
 // NewSessionStore creates a new session store.

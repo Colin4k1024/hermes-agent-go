@@ -5,35 +5,35 @@ import "strings"
 // ModelAliases maps short model names to their full canonical identifiers.
 var ModelAliases = map[string]string{
 	// Anthropic
-	"claude-opus":       "anthropic/claude-opus-4-20250514",
-	"opus":              "anthropic/claude-opus-4-20250514",
-	"claude-sonnet":     "anthropic/claude-sonnet-4-20250514",
-	"sonnet":            "anthropic/claude-sonnet-4-20250514",
-	"claude-haiku":      "anthropic/claude-haiku-4-20250414",
-	"haiku":             "anthropic/claude-haiku-4-20250414",
+	"claude-opus":   "anthropic/claude-opus-4-20250514",
+	"opus":          "anthropic/claude-opus-4-20250514",
+	"claude-sonnet": "anthropic/claude-sonnet-4-20250514",
+	"sonnet":        "anthropic/claude-sonnet-4-20250514",
+	"claude-haiku":  "anthropic/claude-haiku-4-20250414",
+	"haiku":         "anthropic/claude-haiku-4-20250414",
 
 	// OpenAI
-	"gpt4o":             "openai/gpt-4o",
-	"gpt-4o":            "openai/gpt-4o",
-	"gpt4o-mini":        "openai/gpt-4o-mini",
-	"gpt-4o-mini":       "openai/gpt-4o-mini",
-	"o1":                "openai/o1",
-	"o3":                "openai/o3",
+	"gpt4o":       "openai/gpt-4o",
+	"gpt-4o":      "openai/gpt-4o",
+	"gpt4o-mini":  "openai/gpt-4o-mini",
+	"gpt-4o-mini": "openai/gpt-4o-mini",
+	"o1":          "openai/o1",
+	"o3":          "openai/o3",
 
 	// Google
-	"gemini-pro":        "google/gemini-2.5-pro",
-	"gemini-2.5-pro":    "google/gemini-2.5-pro",
-	"gemini-flash":      "google/gemini-2.5-flash",
-	"gemini-2.5-flash":  "google/gemini-2.5-flash",
+	"gemini-pro":       "google/gemini-2.5-pro",
+	"gemini-2.5-pro":   "google/gemini-2.5-pro",
+	"gemini-flash":     "google/gemini-2.5-flash",
+	"gemini-2.5-flash": "google/gemini-2.5-flash",
 
 	// DeepSeek
-	"deepseek":          "deepseek/deepseek-chat",
-	"deepseek-chat":     "deepseek/deepseek-chat",
-	"deepseek-r1":       "deepseek/deepseek-r1",
+	"deepseek":      "deepseek/deepseek-chat",
+	"deepseek-chat": "deepseek/deepseek-chat",
+	"deepseek-r1":   "deepseek/deepseek-r1",
 
 	// Meta
-	"llama-4-maverick":  "meta-llama/llama-4-maverick",
-	"maverick":          "meta-llama/llama-4-maverick",
+	"llama-4-maverick": "meta-llama/llama-4-maverick",
+	"maverick":         "meta-llama/llama-4-maverick",
 }
 
 // NormalizeModelName converts various model name formats to canonical form.

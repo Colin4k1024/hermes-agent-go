@@ -19,9 +19,9 @@ type RateLimiter interface {
 
 // RateLimitConfig holds rate limiting configuration.
 type RateLimitConfig struct {
-	Limiter        RateLimiter
-	DefaultRPM     int
-	TenantLimitFn  func(tenantID string) int // optional: per-tenant override
+	Limiter       RateLimiter
+	DefaultRPM    int
+	TenantLimitFn func(tenantID string) int // optional: per-tenant override
 }
 
 // RateLimitMiddleware applies per-tenant rate limiting.

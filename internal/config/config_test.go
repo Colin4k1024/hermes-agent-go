@@ -174,11 +174,11 @@ func TestMigrateConfig_V1ToV2(t *testing.T) {
 
 func TestMigrateConfig_V1ToLatest(t *testing.T) {
 	cfg := map[string]any{
-		"_config_version":   1,
-		"llm_provider":      "openai",
-		"skin":              "mono",
-		"tool_progress":     true,
-		"default_timeout":   300,
+		"_config_version": 1,
+		"llm_provider":    "openai",
+		"skin":            "mono",
+		"tool_progress":   true,
+		"default_timeout": 300,
 	}
 	migrated, changed := MigrateConfig(cfg)
 	if !changed {

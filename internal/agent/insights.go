@@ -137,15 +137,15 @@ func GetUsageInsights(sessionDB *state.SessionDB, days int) map[string]any {
 	}
 
 	return map[string]any{
-		"days":                  days,
-		"total_sessions":       totalSessions,
-		"total_messages":       totalMessages,
-		"total_input_tokens":   totalInputTokens,
-		"total_output_tokens":  totalOutputTokens,
-		"total_tokens":         totalTokens,
+		"days":                   days,
+		"total_sessions":         totalSessions,
+		"total_messages":         totalMessages,
+		"total_input_tokens":     totalInputTokens,
+		"total_output_tokens":    totalOutputTokens,
+		"total_tokens":           totalTokens,
 		"avg_tokens_per_session": avgTokensPerSession,
-		"estimated_cost_usd":   totalCost,
-		"top_models":           topModelsMap,
-		"sessions_per_day":     sessionsPerDayMap,
+		"estimated_cost_usd":     totalCost,
+		"top_models":             topModelsMap,
+		"sessions_per_day":       sessionsPerDayMap,
 	}
 }

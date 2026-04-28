@@ -49,19 +49,19 @@ type App struct {
 	streaming bool // true if currently streaming a response
 
 	// Lip Gloss styles.
-	promptStyle    lipgloss.Style
+	promptStyle     lipgloss.Style
 	toolPrefixStyle lipgloss.Style
-	dimStyle       lipgloss.Style
-	responseStyle  lipgloss.Style
+	dimStyle        lipgloss.Style
+	responseStyle   lipgloss.Style
 
 	// Session database for insights/browsing.
 	sessionDB *state.SessionDB
 
 	// Runtime flags.
-	quietMode       bool
-	running         bool
+	quietMode        bool
+	running          bool
 	toolProgressMode string // "off", "new", "all", "verbose"
-	yoloMode        bool
+	yoloMode         bool
 }
 
 // NewApp creates a new CLI application.

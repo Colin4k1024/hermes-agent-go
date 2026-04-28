@@ -27,7 +27,7 @@ type Model struct {
 	spinner     spinner.Model
 	history     []chatEntry
 	streaming   strings.Builder
-	isStreaming  bool
+	isStreaming bool
 	isThinking  bool
 	width       int
 	height      int

@@ -13,11 +13,11 @@ import (
 // TelegramAdapter implements PlatformAdapter for Telegram Bot API.
 type TelegramAdapter struct {
 	BasePlatformAdapter
-	bot      *tgbotapi.BotAPI
-	token    string
-	botName  string
-	ctx      context.Context
-	cancel   context.CancelFunc
+	bot     *tgbotapi.BotAPI
+	token   string
+	botName string
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 func NewTelegramAdapter(token string) *TelegramAdapter {

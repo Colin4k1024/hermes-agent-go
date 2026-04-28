@@ -20,10 +20,10 @@ import (
 // When the limit is exceeded, further writes are silently dropped and a
 // truncation notice is appended when the final output is read.
 type LimitedWriter struct {
-	buf       bytes.Buffer
-	maxBytes  int
-	exceeded  bool
-	mu        sync.Mutex
+	buf      bytes.Buffer
+	maxBytes int
+	exceeded bool
+	mu       sync.Mutex
 }
 
 // NewLimitedWriter creates a LimitedWriter with the given byte cap.
@@ -88,8 +88,8 @@ var _ io.Writer = (*LimitedWriter)(nil)
 // --- SandboxConfig ---
 
 const (
-	DefaultMaxStdoutBytes = 50 * 1024  // 50 KB
-	DefaultMaxStderrBytes = 10 * 1024  // 10 KB
+	DefaultMaxStdoutBytes = 50 * 1024 // 50 KB
+	DefaultMaxStderrBytes = 10 * 1024 // 10 KB
 	DefaultMaxToolCalls   = 50
 	DefaultTimeout        = 30 * time.Second
 )
@@ -141,11 +141,11 @@ func (sc *SandboxConfig) IsToolAllowed(toolName string) bool {
 
 // ExecMetrics captures resource-usage statistics from a single code execution.
 type ExecMetrics struct {
-	WallTimeMs   int64 `json:"wall_time_ms"`
-	ExitCode     int   `json:"exit_code"`
-	StdoutBytes  int   `json:"stdout_bytes"`
-	StderrBytes  int   `json:"stderr_bytes"`
-	ToolCallCount int  `json:"tool_call_count"`
+	WallTimeMs    int64 `json:"wall_time_ms"`
+	ExitCode      int   `json:"exit_code"`
+	StdoutBytes   int   `json:"stdout_bytes"`
+	StderrBytes   int   `json:"stderr_bytes"`
+	ToolCallCount int   `json:"tool_call_count"`
 }
 
 // --- File-based RPC for tool call forwarding ---

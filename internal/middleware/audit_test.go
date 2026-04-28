@@ -31,18 +31,18 @@ func (m *mockAuditStore) List(_ context.Context, _ string, _ store.AuditListOpti
 
 func TestAuditMiddleware(t *testing.T) {
 	tests := []struct {
-		name         string
-		authCtx      *auth.AuthContext
-		storeErr     error
-		method       string
-		path         string
-		query        string
-		wantLogs     int
-		wantAction   string
-		wantTenant   string
-		wantUser     string
-		wantDetail   string
-		wantStatus   int
+		name       string
+		authCtx    *auth.AuthContext
+		storeErr   error
+		method     string
+		path       string
+		query      string
+		wantLogs   int
+		wantAction string
+		wantTenant string
+		wantUser   string
+		wantDetail string
+		wantStatus int
 	}{
 		{
 			name: "with AuthContext writes audit log",

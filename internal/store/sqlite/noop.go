@@ -13,12 +13,16 @@ var errSQLiteUnsupported = fmt.Errorf("not supported in SQLite mode — use Post
 
 type noopTenantStore struct{}
 
-func (n *noopTenantStore) Create(_ context.Context, _ *store.Tenant) error { return errSQLiteUnsupported }
+func (n *noopTenantStore) Create(_ context.Context, _ *store.Tenant) error {
+	return errSQLiteUnsupported
+}
 func (n *noopTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error) {
 	return nil, errSQLiteUnsupported
 }
-func (n *noopTenantStore) Update(_ context.Context, _ *store.Tenant) error { return errSQLiteUnsupported }
-func (n *noopTenantStore) Delete(_ context.Context, _ string) error        { return errSQLiteUnsupported }
+func (n *noopTenantStore) Update(_ context.Context, _ *store.Tenant) error {
+	return errSQLiteUnsupported
+}
+func (n *noopTenantStore) Delete(_ context.Context, _ string) error { return errSQLiteUnsupported }
 func (n *noopTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, errSQLiteUnsupported
 }
@@ -42,7 +46,9 @@ var _ store.AuditLogStore = (*noopAuditLogStore)(nil)
 
 type noopAPIKeyStore struct{}
 
-func (n *noopAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error { return errSQLiteUnsupported }
+func (n *noopAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error {
+	return errSQLiteUnsupported
+}
 func (n *noopAPIKeyStore) GetByHash(_ context.Context, _ string) (*store.APIKey, error) {
 	return nil, errSQLiteUnsupported
 }

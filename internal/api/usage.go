@@ -47,8 +47,8 @@ func (h *UsageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"tenant_id":     tenantID,
-		"total_sessions": total,
+		"tenant_id":           tenantID,
+		"total_sessions":      total,
 		"total_input_tokens":  totalInput,
 		"total_output_tokens": totalOutput,
 	})

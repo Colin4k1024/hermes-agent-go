@@ -135,9 +135,9 @@ func (w *WhatsAppAdapter) handleWebhook(rw http.ResponseWriter, r *http.Request)
 			Changes []struct {
 				Value struct {
 					Messages []struct {
-						From string `json:"from"`
+						From string                `json:"from"`
 						Text struct{ Body string } `json:"text"`
-						Type string `json:"type"`
+						Type string                `json:"type"`
 					} `json:"messages"`
 				} `json:"value"`
 			} `json:"changes"`

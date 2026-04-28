@@ -7,9 +7,9 @@ import (
 
 // TLSConfig holds TLS-related configuration.
 type TLSConfig struct {
-	Enabled  bool   `json:"enabled" yaml:"enabled"`
-	CertFile string `json:"cert_file" yaml:"cert_file"`
-	KeyFile  string `json:"key_file" yaml:"key_file"`
+	Enabled    bool   `json:"enabled" yaml:"enabled"`
+	CertFile   string `json:"cert_file" yaml:"cert_file"`
+	KeyFile    string `json:"key_file" yaml:"key_file"`
 	MinVersion string `json:"min_version" yaml:"min_version"` // "1.2" or "1.3"
 }
 

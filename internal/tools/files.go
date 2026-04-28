@@ -246,9 +246,9 @@ func handlePatch(args map[string]any, ctx *ToolContext) string {
 	if count == 0 {
 		// Try fuzzy match (ignore whitespace differences)
 		return toJSON(map[string]any{
-			"error":   "old_string not found in file",
-			"hint":    "Make sure the old_string matches exactly, including whitespace and indentation",
-			"file":    filePath,
+			"error": "old_string not found in file",
+			"hint":  "Make sure the old_string matches exactly, including whitespace and indentation",
+			"file":  filePath,
 		})
 	}
 	if count > 1 {

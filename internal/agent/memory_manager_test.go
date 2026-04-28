@@ -23,16 +23,16 @@ func (m *minimalProvider) SaveUserProfile(c string) error   { return nil }
 
 // fullProvider implements MemoryProvider + all lifecycle interfaces.
 type fullProvider struct {
-	systemBlock    string
-	prefetchCalled bool
-	prefetchQuery  string
-	syncCalled     bool
-	syncUser       string
-	syncAssistant  string
+	systemBlock     string
+	prefetchCalled  bool
+	prefetchQuery   string
+	syncCalled      bool
+	syncUser        string
+	syncAssistant   string
 	preCompressMsgs []llm.Message
 	preCompressOut  string
-	shutdownCalled bool
-	shutdownErr    error
+	shutdownCalled  bool
+	shutdownErr     error
 }
 
 func (f *fullProvider) ReadMemory() (string, error)      { return "", nil }

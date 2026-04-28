@@ -42,12 +42,12 @@ func NewAnthropicClient(model, baseURL, apiKey, provider string) *AnthropicClien
 // --- Anthropic API request/response types ---
 
 type anthropicRequest struct {
-	Model     string               `json:"model"`
-	MaxTokens int                  `json:"max_tokens"`
-	System    any                  `json:"system,omitempty"` // string or []anthropicSystemBlock
-	Messages  []anthropicMessage   `json:"messages"`
-	Tools     []anthropicTool      `json:"tools,omitempty"`
-	Stream    bool                 `json:"stream,omitempty"`
+	Model     string             `json:"model"`
+	MaxTokens int                `json:"max_tokens"`
+	System    any                `json:"system,omitempty"` // string or []anthropicSystemBlock
+	Messages  []anthropicMessage `json:"messages"`
+	Tools     []anthropicTool    `json:"tools,omitempty"`
+	Stream    bool               `json:"stream,omitempty"`
 }
 
 // anthropicSystemBlock supports cache_control on system prompt blocks.
@@ -94,8 +94,8 @@ type anthropicResponse struct {
 }
 
 type anthropicUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
 }
@@ -108,12 +108,12 @@ type anthropicError struct {
 // --- Streaming event types ---
 
 type anthropicStreamEvent struct {
-	Type  string          `json:"type"`
-	Index int             `json:"index,omitempty"`
-	Delta json.RawMessage `json:"delta,omitempty"`
+	Type         string                 `json:"type"`
+	Index        int                    `json:"index,omitempty"`
+	Delta        json.RawMessage        `json:"delta,omitempty"`
 	ContentBlock *anthropicContentBlock `json:"content_block,omitempty"`
-	Message *anthropicResponse `json:"message,omitempty"`
-	Usage  *anthropicUsage `json:"usage,omitempty"`
+	Message      *anthropicResponse     `json:"message,omitempty"`
+	Usage        *anthropicUsage        `json:"usage,omitempty"`
 }
 
 type anthropicDelta struct {

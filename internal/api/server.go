@@ -17,14 +17,14 @@ import (
 
 // APIServerConfig holds all dependencies for the SaaS API server.
 type APIServerConfig struct {
-	Port          int
-	Store         store.Store
-	DB            DBPinger // optional; nil disables readiness DB check
-	AuthChain     *auth.ExtractorChain
-	RBAC          middleware.RBACConfig
-	RateLimit     middleware.RateLimitConfig
+	Port           int
+	Store          store.Store
+	DB             DBPinger // optional; nil disables readiness DB check
+	AuthChain      *auth.ExtractorChain
+	RBAC           middleware.RBACConfig
+	RateLimit      middleware.RateLimitConfig
 	AllowedOrigins string // comma-separated list of allowed origins, or "*" for all
-	StaticDir    string  // directory to serve static files from (optional)
+	StaticDir      string // directory to serve static files from (optional)
 }
 
 // APIServer is the multi-tenant SaaS API HTTP server.

@@ -19,13 +19,13 @@ func NewMeHandler(s store.Store) *MeHandler {
 
 // meResponse mirrors the fields needed by the SaaS admin SPA.
 type meResponse struct {
-	TenantID      string `json:"tenant_id"`
-	Identity      string `json:"identity"`
-	Roles         []string `json:"roles"`
-	AuthMethod    string `json:"auth_method"`
-	Plan         string `json:"plan,omitempty"`
-	RateLimitRPM  int    `json:"rate_limit_rpm,omitempty"`
-	MaxSessions   int    `json:"max_sessions,omitempty"`
+	TenantID     string   `json:"tenant_id"`
+	Identity     string   `json:"identity"`
+	Roles        []string `json:"roles"`
+	AuthMethod   string   `json:"auth_method"`
+	Plan         string   `json:"plan,omitempty"`
+	RateLimitRPM int      `json:"rate_limit_rpm,omitempty"`
+	MaxSessions  int      `json:"max_sessions,omitempty"`
 }
 
 func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

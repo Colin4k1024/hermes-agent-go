@@ -16,7 +16,6 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/state"
 	"github.com/hermes-agent/hermes-agent-go/internal/tools"
 	"github.com/hermes-agent/hermes-agent-go/internal/toolsets"
-
 )
 
 // FallbackModel describes an alternative model to try on API failures.
@@ -30,26 +29,26 @@ type FallbackModel struct {
 // AIAgent is the core agent that manages conversations with LLM and tools.
 type AIAgent struct {
 	// Configuration
-	model                string
-	baseURL              string
-	apiKey               string
-	provider             string
-	apiMode              string // "openai" or "anthropic"
-	maxIterations        int
-	platform             string
-	sessionID            string
-	quietMode            bool
-	enabledToolsets      []string
-	disabledToolsets     []string
+	model                 string
+	baseURL               string
+	apiKey                string
+	provider              string
+	apiMode               string // "openai" or "anthropic"
+	maxIterations         int
+	platform              string
+	sessionID             string
+	quietMode             bool
+	enabledToolsets       []string
+	disabledToolsets      []string
 	ephemeralSystemPrompt string
-	skillLoader          skills.SkillLoader
-	tenantID             string
-	userID               string
-	memoryProvider       tools.MemoryProvider
-	skipContextFiles     bool
-	skipMemory           bool
-	persistSession       bool
-	compressionCfg       CompressionConfig
+	skillLoader           skills.SkillLoader
+	tenantID              string
+	userID                string
+	memoryProvider        tools.MemoryProvider
+	skipContextFiles      bool
+	skipMemory            bool
+	persistSession        bool
+	compressionCfg        CompressionConfig
 
 	// Session resume
 	resumeSessionID string
@@ -64,11 +63,11 @@ type AIAgent struct {
 	client          *llm.Client
 	auxiliaryClient *AuxiliaryClient
 	sessionDB       *state.SessionDB
-	budget        *IterationBudget
-	callbacks     *StreamCallbacks
-	toolDefs      []llm.ToolDef
-	validTools    map[string]bool
-	systemPrompt  string
+	budget          *IterationBudget
+	callbacks       *StreamCallbacks
+	toolDefs        []llm.ToolDef
+	validTools      map[string]bool
+	systemPrompt    string
 
 	// Interrupt support (lock-free)
 	interruptRequested atomic.Bool
@@ -509,7 +508,6 @@ func (a *AIAgent) Close() {
 	}
 }
 
-
 // executeToolCalls runs tool calls, parallelizing when safe.
 // Uses smart path-based overlap detection for file-scoped tools.
 func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
@@ -578,7 +576,6 @@ func (a *AIAgent) executeToolCalls(toolCalls []llm.ToolCall) []llm.Message {
 
 	return collected
 }
-
 
 func (a *AIAgent) executeSingleTool(tc llm.ToolCall) llm.Message {
 	toolName := tc.Function.Name

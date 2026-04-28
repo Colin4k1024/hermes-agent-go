@@ -183,13 +183,13 @@ func (m *MetricsCollector) Snapshot() map[string]any {
 	}
 
 	return map[string]any{
-		"messages":          m.messageCount,
-		"responses":         m.responseCount,
-		"errors":            m.errorCount,
-		"tool_calls":        m.toolCallCount,
-		"avg_latency_ms":    avgLatency,
-		"uptime_seconds":    int64(uptime.Seconds()),
-		"last_message_at":   m.lastMessage.Format(time.RFC3339),
+		"messages":        m.messageCount,
+		"responses":       m.responseCount,
+		"errors":          m.errorCount,
+		"tool_calls":      m.toolCallCount,
+		"avg_latency_ms":  avgLatency,
+		"uptime_seconds":  int64(uptime.Seconds()),
+		"last_message_at": m.lastMessage.Format(time.RFC3339),
 	}
 }
 

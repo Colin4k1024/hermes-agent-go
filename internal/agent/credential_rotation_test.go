@@ -453,9 +453,9 @@ func TestSaveState_CreatesDirectory(t *testing.T) {
 
 func TestStrategyFromConfig(t *testing.T) {
 	tests := []struct {
-		name   string
-		cfg    *config.Config
-		want   string
+		name string
+		cfg  *config.Config
+		want string
 	}{
 		{
 			name: "nil routing",

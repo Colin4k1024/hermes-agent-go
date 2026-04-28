@@ -46,10 +46,10 @@ func (t *GeminiTransport) Name() string { return "gemini" }
 // --- Gemini API types ---
 
 type geminiRequest struct {
-	Contents         []geminiContent        `json:"contents"`
-	Tools            []geminiToolDecl       `json:"tools,omitempty"`
-	SystemInstruction *geminiContent        `json:"systemInstruction,omitempty"`
-	GenerationConfig *geminiGenerationCfg   `json:"generationConfig,omitempty"`
+	Contents          []geminiContent      `json:"contents"`
+	Tools             []geminiToolDecl     `json:"tools,omitempty"`
+	SystemInstruction *geminiContent       `json:"systemInstruction,omitempty"`
+	GenerationConfig  *geminiGenerationCfg `json:"generationConfig,omitempty"`
 }
 
 type geminiContent struct {
@@ -58,9 +58,9 @@ type geminiContent struct {
 }
 
 type geminiPart struct {
-	Text             string                `json:"text,omitempty"`
-	FunctionCall     *geminiFunctionCall   `json:"functionCall,omitempty"`
-	FunctionResponse *geminiFunctionResp   `json:"functionResponse,omitempty"`
+	Text             string              `json:"text,omitempty"`
+	FunctionCall     *geminiFunctionCall `json:"functionCall,omitempty"`
+	FunctionResponse *geminiFunctionResp `json:"functionResponse,omitempty"`
 }
 
 type geminiFunctionCall struct {
@@ -89,13 +89,13 @@ type geminiGenerationCfg struct {
 }
 
 type geminiResponse struct {
-	Candidates []geminiCandidate `json:"candidates"`
-	UsageMetadata *geminiUsage   `json:"usageMetadata,omitempty"`
+	Candidates    []geminiCandidate `json:"candidates"`
+	UsageMetadata *geminiUsage      `json:"usageMetadata,omitempty"`
 }
 
 type geminiCandidate struct {
-	Content       geminiContent `json:"content"`
-	FinishReason  string        `json:"finishReason"`
+	Content      geminiContent `json:"content"`
+	FinishReason string        `json:"finishReason"`
 }
 
 type geminiUsage struct {

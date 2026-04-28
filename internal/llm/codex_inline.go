@@ -41,12 +41,12 @@ func (t *codexHTTPTransport) resolveBaseURL() string {
 // --- Codex API types ---
 
 type codexRequest struct {
-	Model           string          `json:"model"`
-	Input           []codexInput    `json:"input"`
-	Tools           []codexToolDef  `json:"tools,omitempty"`
-	MaxOutputTokens int             `json:"max_output_tokens,omitempty"`
-	Temperature     *float32        `json:"temperature,omitempty"`
-	Stream          bool            `json:"stream,omitempty"`
+	Model           string         `json:"model"`
+	Input           []codexInput   `json:"input"`
+	Tools           []codexToolDef `json:"tools,omitempty"`
+	MaxOutputTokens int            `json:"max_output_tokens,omitempty"`
+	Temperature     *float32       `json:"temperature,omitempty"`
+	Stream          bool           `json:"stream,omitempty"`
 }
 
 type codexInput struct {
@@ -85,9 +85,9 @@ type codexUsage struct {
 }
 
 type codexStreamEvent struct {
-	Type     string           `json:"type"`
-	Item     *codexOutputItem `json:"item,omitempty"`
-	Delta    string           `json:"delta,omitempty"`
+	Type  string           `json:"type"`
+	Item  *codexOutputItem `json:"item,omitempty"`
+	Delta string           `json:"delta,omitempty"`
 }
 
 func (t *codexHTTPTransport) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
@@ -186,8 +186,8 @@ func (t *codexHTTPTransport) ChatStream(ctx context.Context, req ChatRequest) (<
 			case "response.output_item.added":
 				if event.Item != nil && event.Item.Type == "function_call" {
 					toolCalls = append(toolCalls, ToolCall{
-						ID:   event.Item.CallID,
-						Type: "function",
+						ID:       event.Item.CallID,
+						Type:     "function",
 						Function: FunctionCall{Name: event.Item.Name},
 					})
 				}

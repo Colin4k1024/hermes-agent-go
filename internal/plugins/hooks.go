@@ -27,12 +27,12 @@ type HookEvent struct {
 
 // Hook types
 const (
-	HookPreToolCall    = "pre_tool_call"
-	HookPostToolCall   = "post_tool_call"
-	HookPreLLMCall     = "pre_llm_call"
-	HookPostLLMCall    = "post_llm_call"
-	HookSessionStart   = "on_session_start"
-	HookSessionEnd     = "on_session_end"
+	HookPreToolCall  = "pre_tool_call"
+	HookPostToolCall = "post_tool_call"
+	HookPreLLMCall   = "pre_llm_call"
+	HookPostLLMCall  = "post_llm_call"
+	HookSessionStart = "on_session_start"
+	HookSessionEnd   = "on_session_end"
 )
 
 // PluginHookRegistry manages plugin lifecycle hooks.

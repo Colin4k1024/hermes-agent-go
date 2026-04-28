@@ -43,12 +43,12 @@ type MessageEvent struct {
 	SystemPrompt string            `json:"system_prompt,omitempty"`
 	MessageType  MessageType       `json:"message_type"`
 	Source       SessionSource     `json:"source"`
-	MediaURLs   []string          `json:"media_urls,omitempty"`
-	MediaPaths  []string          `json:"media_paths,omitempty"`
-	ReplyToID   string            `json:"reply_to_id,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	History     []llm.Message     `json:"history,omitempty"`
-	RawMessage  any               `json:"-"` // Platform-specific raw message
+	MediaURLs    []string          `json:"media_urls,omitempty"`
+	MediaPaths   []string          `json:"media_paths,omitempty"`
+	ReplyToID    string            `json:"reply_to_id,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	History      []llm.Message     `json:"history,omitempty"`
+	RawMessage   any               `json:"-"` // Platform-specific raw message
 }
 
 // SendResult represents the result of sending a message.
@@ -176,8 +176,8 @@ type PlatformConfig struct {
 // GatewayConfig holds the full gateway configuration.
 type GatewayConfig struct {
 	Platforms    map[Platform]*PlatformConfig `yaml:"platforms"`
-	Settings     GatewaySettings             `yaml:"settings"`
-	AllowedUsers map[string]any              `yaml:"allowed_users"`
+	Settings     GatewaySettings              `yaml:"settings"`
+	AllowedUsers map[string]any               `yaml:"allowed_users"`
 }
 
 // GatewaySettings holds gateway-level settings.

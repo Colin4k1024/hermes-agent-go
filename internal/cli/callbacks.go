@@ -120,4 +120,3 @@ func (c *CLICallbacks) SecretCallback(prompt string) string {
 	fmt.Fprintln(os.Stderr)
 	return string(secret)
 }
-

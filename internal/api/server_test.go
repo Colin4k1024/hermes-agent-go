@@ -13,15 +13,17 @@ import (
 // stubSessionStore implements store.SessionStore with no-op methods.
 type stubSessionStore struct{}
 
-func (stubSessionStore) Create(_ context.Context, _ string, _ *store.Session) error         { return nil }
-func (stubSessionStore) Get(_ context.Context, _, _ string) (*store.Session, error)          { return nil, nil }
-func (stubSessionStore) End(_ context.Context, _, _, _ string) error                         { return nil }
+func (stubSessionStore) Create(_ context.Context, _ string, _ *store.Session) error { return nil }
+func (stubSessionStore) Get(_ context.Context, _, _ string) (*store.Session, error) { return nil, nil }
+func (stubSessionStore) End(_ context.Context, _, _, _ string) error                { return nil }
 func (stubSessionStore) List(_ context.Context, _ string, _ store.ListOptions) ([]*store.Session, int, error) {
 	return nil, 0, nil
 }
-func (stubSessionStore) Delete(_ context.Context, _, _ string) error                         { return nil }
-func (stubSessionStore) UpdateTokens(_ context.Context, _, _ string, _ store.TokenDelta) error { return nil }
-func (stubSessionStore) SetTitle(_ context.Context, _, _, _ string) error                    { return nil }
+func (stubSessionStore) Delete(_ context.Context, _, _ string) error { return nil }
+func (stubSessionStore) UpdateTokens(_ context.Context, _, _ string, _ store.TokenDelta) error {
+	return nil
+}
+func (stubSessionStore) SetTitle(_ context.Context, _, _, _ string) error { return nil }
 
 // stubMessageStore implements store.MessageStore with no-op methods.
 type stubMessageStore struct{}
@@ -40,19 +42,21 @@ func (stubMessageStore) CountBySession(_ context.Context, _, _ string) (int, err
 // stubUserStore implements store.UserStore with no-op methods.
 type stubUserStore struct{}
 
-func (stubUserStore) GetOrCreate(_ context.Context, _, _, _ string) (*store.User, error) { return nil, nil }
-func (stubUserStore) IsApproved(_ context.Context, _, _, _ string) (bool, error)         { return false, nil }
-func (stubUserStore) Approve(_ context.Context, _, _, _ string) error                    { return nil }
-func (stubUserStore) Revoke(_ context.Context, _, _, _ string) error                     { return nil }
-func (stubUserStore) ListApproved(_ context.Context, _, _ string) ([]string, error)      { return nil, nil }
+func (stubUserStore) GetOrCreate(_ context.Context, _, _, _ string) (*store.User, error) {
+	return nil, nil
+}
+func (stubUserStore) IsApproved(_ context.Context, _, _, _ string) (bool, error)    { return false, nil }
+func (stubUserStore) Approve(_ context.Context, _, _, _ string) error               { return nil }
+func (stubUserStore) Revoke(_ context.Context, _, _, _ string) error                { return nil }
+func (stubUserStore) ListApproved(_ context.Context, _, _ string) ([]string, error) { return nil, nil }
 
 // stubTenantStore implements store.TenantStore with no-op methods.
 type stubTenantStore struct{}
 
-func (stubTenantStore) Create(_ context.Context, _ *store.Tenant) error                       { return nil }
-func (stubTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error)                { return nil, nil }
-func (stubTenantStore) Update(_ context.Context, _ *store.Tenant) error                       { return nil }
-func (stubTenantStore) Delete(_ context.Context, _ string) error                              { return nil }
+func (stubTenantStore) Create(_ context.Context, _ *store.Tenant) error        { return nil }
+func (stubTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error) { return nil, nil }
+func (stubTenantStore) Update(_ context.Context, _ *store.Tenant) error        { return nil }
+func (stubTenantStore) Delete(_ context.Context, _ string) error               { return nil }
 func (stubTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, nil
 }
@@ -68,22 +72,24 @@ func (stubAuditLogStore) List(_ context.Context, _ string, _ store.AuditListOpti
 // stubAPIKeyStore implements store.APIKeyStore with no-op methods.
 type stubAPIKeyStore struct{}
 
-func (stubAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error                { return nil }
-func (stubAPIKeyStore) GetByHash(_ context.Context, _ string) (*store.APIKey, error)   { return nil, nil }
-func (stubAPIKeyStore) GetByID(_ context.Context, _, _ string) (*store.APIKey, error)  { return nil, nil }
-func (stubAPIKeyStore) List(_ context.Context, _ string) ([]*store.APIKey, error)      { return nil, nil }
-func (stubAPIKeyStore) Revoke(_ context.Context, _, _ string) error                    { return nil }
+func (stubAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error              { return nil }
+func (stubAPIKeyStore) GetByHash(_ context.Context, _ string) (*store.APIKey, error) { return nil, nil }
+func (stubAPIKeyStore) GetByID(_ context.Context, _, _ string) (*store.APIKey, error) {
+	return nil, nil
+}
+func (stubAPIKeyStore) List(_ context.Context, _ string) ([]*store.APIKey, error) { return nil, nil }
+func (stubAPIKeyStore) Revoke(_ context.Context, _, _ string) error               { return nil }
 
 // stubStore implements store.Store, returning stub sub-stores.
 type stubStore struct{}
 
-func (stubStore) Sessions() store.SessionStore   { return stubSessionStore{} }
-func (stubStore) Messages() store.MessageStore   { return stubMessageStore{} }
-func (stubStore) Users() store.UserStore         { return stubUserStore{} }
-func (stubStore) Tenants() store.TenantStore     { return stubTenantStore{} }
-func (stubStore) AuditLogs() store.AuditLogStore { return stubAuditLogStore{} }
-func (stubStore) APIKeys() store.APIKeyStore     { return stubAPIKeyStore{} }
-func (stubStore) Close() error                   { return nil }
+func (stubStore) Sessions() store.SessionStore    { return stubSessionStore{} }
+func (stubStore) Messages() store.MessageStore    { return stubMessageStore{} }
+func (stubStore) Users() store.UserStore          { return stubUserStore{} }
+func (stubStore) Tenants() store.TenantStore      { return stubTenantStore{} }
+func (stubStore) AuditLogs() store.AuditLogStore  { return stubAuditLogStore{} }
+func (stubStore) APIKeys() store.APIKeyStore      { return stubAPIKeyStore{} }
+func (stubStore) Close() error                    { return nil }
 func (stubStore) Migrate(_ context.Context) error { return nil }
 
 func TestNewAPIServer(t *testing.T) {

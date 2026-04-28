@@ -15,12 +15,12 @@ import (
 
 // Scheduler manages scheduled cron jobs using robfig/cron.
 type Scheduler struct {
-	mu        sync.Mutex
-	cron      *robfigcron.Cron
-	store     *JobStore
-	entryMap  map[string]robfigcron.EntryID // job ID -> cron entry ID
-	running   bool
-	adapters  map[string]any // platform adapters for delivery
+	mu       sync.Mutex
+	cron     *robfigcron.Cron
+	store    *JobStore
+	entryMap map[string]robfigcron.EntryID // job ID -> cron entry ID
+	running  bool
+	adapters map[string]any // platform adapters for delivery
 }
 
 // NewScheduler creates a new cron scheduler.

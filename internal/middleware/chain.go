@@ -32,7 +32,9 @@ func NewStack(cfg StackConfig) *MiddlewareStack {
 
 // Wrap applies the full middleware chain to the given handler.
 // Execution order (outermost first):
-//   Tracing → Metrics → RequestID → Auth → Tenant → Logging → Audit → RBAC → RateLimit → Handler
+//
+//	Tracing → Metrics → RequestID → Auth → Tenant → Logging → Audit → RBAC → RateLimit → Handler
+//
 // Logging runs after Auth+Tenant so it can enrich the logger with tenant_id.
 // Auth errors use ContextLogger fallback (slog.Default with request_id from RequestID middleware).
 func (s *MiddlewareStack) Wrap(handler http.Handler) http.Handler {

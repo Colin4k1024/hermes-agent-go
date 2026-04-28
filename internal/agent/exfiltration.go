@@ -15,9 +15,9 @@ type ExfilAttempt struct {
 }
 
 var (
-	urlPattern   = regexp.MustCompile(`https?://[^\s"'<>]+`)
-	b64Pattern   = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)
-	dataURIPat   = regexp.MustCompile(`data:[^;]+;base64,[A-Za-z0-9+/=]{20,}`)
+	urlPattern = regexp.MustCompile(`https?://[^\s"'<>]+`)
+	b64Pattern = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)
+	dataURIPat = regexp.MustCompile(`data:[^;]+;base64,[A-Za-z0-9+/=]{20,}`)
 
 	secretPrefixes = []string{
 		"sk-", "sk-ant-", "ghp_", "gho_", "ghu_", "ghs_",

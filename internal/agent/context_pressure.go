@@ -6,11 +6,11 @@ import "log/slog"
 type ContextPressureLevel int
 
 const (
-	PressureNone    ContextPressureLevel = iota
-	PressureLow                                  // >50% used
-	PressureMedium                               // >70% used
-	PressureHigh                                 // >85% used
-	PressureCritical                             // >95% used
+	PressureNone     ContextPressureLevel = iota
+	PressureLow                           // >50% used
+	PressureMedium                        // >70% used
+	PressureHigh                          // >85% used
+	PressureCritical                      // >95% used
 )
 
 // CheckContextPressure evaluates token usage against the model's context window

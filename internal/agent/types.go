@@ -8,39 +8,39 @@ import (
 
 // ConversationResult holds the result of a conversation turn.
 type ConversationResult struct {
-	FinalResponse    string            `json:"final_response"`
-	LastReasoning    string            `json:"last_reasoning,omitempty"`
-	Messages         []llm.Message     `json:"messages"`
-	APICalls         int               `json:"api_calls"`
-	Completed        bool              `json:"completed"`
-	Partial          bool              `json:"partial"`
-	Interrupted      bool              `json:"interrupted"`
-	InterruptMessage string            `json:"interrupt_message,omitempty"`
-	Model            string            `json:"model"`
-	Provider         string            `json:"provider"`
-	BaseURL          string            `json:"base_url"`
-	InputTokens      int               `json:"input_tokens"`
-	OutputTokens     int               `json:"output_tokens"`
-	CacheReadTokens  int               `json:"cache_read_tokens"`
-	CacheWriteTokens int               `json:"cache_write_tokens"`
-	ReasoningTokens  int               `json:"reasoning_tokens"`
-	TotalTokens      int               `json:"total_tokens"`
-	EstimatedCostUSD float64           `json:"estimated_cost_usd"`
-	CostStatus       string            `json:"cost_status"`
-	CostSource       string            `json:"cost_source"`
+	FinalResponse    string        `json:"final_response"`
+	LastReasoning    string        `json:"last_reasoning,omitempty"`
+	Messages         []llm.Message `json:"messages"`
+	APICalls         int           `json:"api_calls"`
+	Completed        bool          `json:"completed"`
+	Partial          bool          `json:"partial"`
+	Interrupted      bool          `json:"interrupted"`
+	InterruptMessage string        `json:"interrupt_message,omitempty"`
+	Model            string        `json:"model"`
+	Provider         string        `json:"provider"`
+	BaseURL          string        `json:"base_url"`
+	InputTokens      int           `json:"input_tokens"`
+	OutputTokens     int           `json:"output_tokens"`
+	CacheReadTokens  int           `json:"cache_read_tokens"`
+	CacheWriteTokens int           `json:"cache_write_tokens"`
+	ReasoningTokens  int           `json:"reasoning_tokens"`
+	TotalTokens      int           `json:"total_tokens"`
+	EstimatedCostUSD float64       `json:"estimated_cost_usd"`
+	CostStatus       string        `json:"cost_status"`
+	CostSource       string        `json:"cost_source"`
 }
 
 // StreamCallbacks holds all callback functions for streaming events.
 type StreamCallbacks struct {
-	OnStreamDelta    func(text string)
-	OnReasoning      func(text string)
-	OnThinking       func(msg string)
+	OnStreamDelta  func(text string)
+	OnReasoning    func(text string)
+	OnThinking     func(msg string)
 	OnToolProgress func(toolName, argsPreview string)
-	OnToolStart      func(toolName string)
-	OnToolComplete   func(toolName string)
-	OnStep           func(iteration int, prevTools []string)
-	OnStatus         func(msg string)
-	OnClarify        func(question string, choices []string) string
+	OnToolStart    func(toolName string)
+	OnToolComplete func(toolName string)
+	OnStep         func(iteration int, prevTools []string)
+	OnStatus       func(msg string)
+	OnClarify      func(question string, choices []string) string
 }
 
 // AgentOption is a functional option for configuring AIAgent.

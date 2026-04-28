@@ -83,9 +83,9 @@ func TestAPIKeyExtractor(t *testing.T) {
 
 	mockStore := &mockAPIKeyStore{
 		keys: map[string]*store.APIKey{
-			hashTestKey(rawKey):              validKey,
-			hashTestKey("revoked-key-raw"):   revokedKey,
-			hashTestKey("expired-key-raw"):   expiredKey,
+			hashTestKey(rawKey):            validKey,
+			hashTestKey("revoked-key-raw"): revokedKey,
+			hashTestKey("expired-key-raw"): expiredKey,
 		},
 	}
 

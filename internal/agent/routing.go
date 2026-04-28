@@ -7,9 +7,9 @@ import (
 
 // SmartRouter decides whether a message is simple enough to route to a cheaper model.
 type SmartRouter struct {
-	CheapModel     string  // e.g. "openai/gpt-4o-mini"
-	Threshold      int     // max character count for "simple" messages (default 200)
-	Enabled        bool
+	CheapModel string // e.g. "openai/gpt-4o-mini"
+	Threshold  int    // max character count for "simple" messages (default 200)
+	Enabled    bool
 }
 
 // DefaultSmartRouter returns a SmartRouter with sensible defaults.

@@ -12,11 +12,11 @@ import (
 
 // TodoItem represents a single todo item.
 type TodoItem struct {
-	ID        int       `json:"id"`
-	Task      string    `json:"task"`
-	Status    string    `json:"status"` // "pending", "in_progress", "done"
-	Priority  string    `json:"priority,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int        `json:"id"`
+	Task      string     `json:"task"`
+	Status    string     `json:"status"` // "pending", "in_progress", "done"
+	Priority  string     `json:"priority,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 	DoneAt    *time.Time `json:"done_at,omitempty"`
 }
 

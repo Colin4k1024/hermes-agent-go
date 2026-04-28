@@ -13,14 +13,14 @@ import (
 
 // Trajectory represents a recorded agent session for RL training data.
 type Trajectory struct {
-	SessionID string            `json:"session_id"`
-	Model     string            `json:"model"`
-	Messages  []llm.Message     `json:"messages"`
-	ToolCalls int               `json:"tool_calls"`
-	Tokens    map[string]int    `json:"tokens"`
-	Duration  time.Duration     `json:"duration_ns"`
-	Completed bool              `json:"completed"`
-	Timestamp time.Time         `json:"timestamp"`
+	SessionID string         `json:"session_id"`
+	Model     string         `json:"model"`
+	Messages  []llm.Message  `json:"messages"`
+	ToolCalls int            `json:"tool_calls"`
+	Tokens    map[string]int `json:"tokens"`
+	Duration  time.Duration  `json:"duration_ns"`
+	Completed bool           `json:"completed"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 // SaveTrajectory serializes a trajectory to a JSON file in the given output directory.

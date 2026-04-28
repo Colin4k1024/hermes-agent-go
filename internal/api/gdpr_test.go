@@ -97,11 +97,11 @@ func gdprReq(method, path string, tenantID string) *http.Request {
 
 func TestGDPRExportHandler(t *testing.T) {
 	tests := []struct {
-		name       string
-		method     string
-		tenantID   string
-		seedData   func(*mockSessionStore, *mockMessageStore)
-		wantStatus int
+		name        string
+		method      string
+		tenantID    string
+		seedData    func(*mockSessionStore, *mockMessageStore)
+		wantStatus  int
 		checkHeader func(t *testing.T, h http.Header)
 	}{
 		{

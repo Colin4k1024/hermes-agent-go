@@ -13,15 +13,15 @@ import (
 
 // CronJob represents a scheduled job.
 type CronJob struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Schedule  string    `json:"schedule"`
-	Command   string    `json:"command"`
-	Enabled   bool      `json:"enabled"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Schedule  string     `json:"schedule"`
+	Command   string     `json:"command"`
+	Enabled   bool       `json:"enabled"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 	LastRun   *time.Time `json:"last_run,omitempty"`
-	RunCount  int       `json:"run_count"`
+	RunCount  int        `json:"run_count"`
 }
 
 func init() {

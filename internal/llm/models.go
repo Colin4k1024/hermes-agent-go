@@ -31,7 +31,7 @@ var KnownModels = map[string]ModelMeta{
 	"bedrock/amazon.titan-text-premier":   {ContextLength: 32000, MaxOutput: 8192, SupportsTools: false, SupportsVision: false},
 
 	// Codex / Responses API
-	"openai/codex-mini":                   {ContextLength: 200000, MaxOutput: 100000, SupportsTools: true, SupportsVision: false},
+	"openai/codex-mini": {ContextLength: 200000, MaxOutput: 100000, SupportsTools: true, SupportsVision: false},
 }
 
 // EstimateTokens gives a rough token count for a string.

@@ -33,13 +33,13 @@ func New(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-func (s *SQLiteStore) Sessions() store.SessionStore   { return &sqliteSessions{db: s.db} }
-func (s *SQLiteStore) Messages() store.MessageStore   { return &sqliteMessages{db: s.db} }
-func (s *SQLiteStore) Users() store.UserStore         { return &sqliteUsers{} }
-func (s *SQLiteStore) Tenants() store.TenantStore     { return &noopTenantStore{} }
-func (s *SQLiteStore) AuditLogs() store.AuditLogStore { return &noopAuditLogStore{} }
-func (s *SQLiteStore) APIKeys() store.APIKeyStore     { return &noopAPIKeyStore{} }
-func (s *SQLiteStore) Close() error                   { return s.db.Close() }
+func (s *SQLiteStore) Sessions() store.SessionStore    { return &sqliteSessions{db: s.db} }
+func (s *SQLiteStore) Messages() store.MessageStore    { return &sqliteMessages{db: s.db} }
+func (s *SQLiteStore) Users() store.UserStore          { return &sqliteUsers{} }
+func (s *SQLiteStore) Tenants() store.TenantStore      { return &noopTenantStore{} }
+func (s *SQLiteStore) AuditLogs() store.AuditLogStore  { return &noopAuditLogStore{} }
+func (s *SQLiteStore) APIKeys() store.APIKeyStore      { return &noopAPIKeyStore{} }
+func (s *SQLiteStore) Close() error                    { return s.db.Close() }
 func (s *SQLiteStore) Migrate(_ context.Context) error { return nil } // SQLite migrations handled by SessionDB
 
 var _ store.Store = (*SQLiteStore)(nil)

@@ -44,12 +44,12 @@ func (t *CodexTransport) Name() string { return "codex" }
 // --- Responses API types ---
 
 type responsesRequest struct {
-	Model        string            `json:"model"`
-	Input        []responsesInput  `json:"input"`
-	Tools        []responsesTool   `json:"tools,omitempty"`
-	MaxOutputTokens int            `json:"max_output_tokens,omitempty"`
-	Temperature  *float32          `json:"temperature,omitempty"`
-	Stream       bool              `json:"stream,omitempty"`
+	Model           string           `json:"model"`
+	Input           []responsesInput `json:"input"`
+	Tools           []responsesTool  `json:"tools,omitempty"`
+	MaxOutputTokens int              `json:"max_output_tokens,omitempty"`
+	Temperature     *float32         `json:"temperature,omitempty"`
+	Stream          bool             `json:"stream,omitempty"`
 }
 
 type responsesInput struct {
@@ -63,17 +63,17 @@ type responsesInput struct {
 }
 
 type responsesTool struct {
-	Type       string         `json:"type"`
-	Name       string         `json:"name"`
-	Description string        `json:"description"`
-	Parameters map[string]any `json:"parameters,omitempty"`
+	Type        string         `json:"type"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
 }
 
 type responsesResponse struct {
-	ID      string           `json:"id"`
-	Output  []responsesItem  `json:"output"`
-	Usage   *responsesUsage  `json:"usage,omitempty"`
-	Status  string           `json:"status"`
+	ID     string          `json:"id"`
+	Output []responsesItem `json:"output"`
+	Usage  *responsesUsage `json:"usage,omitempty"`
+	Status string          `json:"status"`
 }
 
 type responsesItem struct {
@@ -93,9 +93,9 @@ type responsesUsage struct {
 }
 
 type responsesStreamEvent struct {
-	Type     string          `json:"type"`
-	Item     *responsesItem  `json:"item,omitempty"`
-	Delta    string          `json:"delta,omitempty"`
+	Type     string             `json:"type"`
+	Item     *responsesItem     `json:"item,omitempty"`
+	Delta    string             `json:"delta,omitempty"`
 	Response *responsesResponse `json:"response,omitempty"`
 }
 

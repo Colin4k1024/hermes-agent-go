@@ -256,10 +256,10 @@ func checkBrowserRequirements() bool {
 
 func browserStubResponse(tool string) string {
 	return toJSON(map[string]any{
-		"error":   "Browser tool requires Browserbase API key",
-		"tool":    tool,
-		"hint":    "Set BROWSERBASE_API_KEY environment variable to enable browser tools",
-		"docs":    "https://www.browserbase.com/docs",
+		"error": "Browser tool requires Browserbase API key",
+		"tool":  tool,
+		"hint":  "Set BROWSERBASE_API_KEY environment variable to enable browser tools",
+		"docs":  "https://www.browserbase.com/docs",
 	})
 }
 

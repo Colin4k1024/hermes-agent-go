@@ -218,9 +218,9 @@ func handleHAGetState(args map[string]any, ctx *ToolContext) string {
 	}
 
 	return toJSON(map[string]any{
-		"entity_id":  entityID,
-		"state":      state["state"],
-		"attributes": state["attributes"],
+		"entity_id":    entityID,
+		"state":        state["state"],
+		"attributes":   state["attributes"],
 		"last_changed": state["last_changed"],
 		"last_updated": state["last_updated"],
 	})

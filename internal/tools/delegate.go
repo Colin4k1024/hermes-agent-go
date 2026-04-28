@@ -10,7 +10,6 @@ import (
 
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
 	"github.com/hermes-agent/hermes-agent-go/internal/llm"
-
 )
 
 const (

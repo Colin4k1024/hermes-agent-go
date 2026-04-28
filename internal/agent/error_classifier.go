@@ -12,19 +12,19 @@ import (
 type FailoverReason int
 
 const (
-	ReasonUnknown         FailoverReason = iota + 1 // 规范八：枚举从 1 开始
-	ReasonAuth                                      // 401/403 transient auth
-	ReasonAuthPermanent                             // auth failed after refresh
-	ReasonBilling                                   // 402 / credit exhaustion
-	ReasonRateLimit                                 // 429 / throttling
-	ReasonOverloaded                                // 503/529 server overloaded
-	ReasonServerError                               // 500/502 internal error
-	ReasonTimeout                                   // connection/read timeout
-	ReasonContextOverflow                           // context too large
-	ReasonModelNotFound                             // 404 / invalid model
-	ReasonFormatError                               // 400 bad request
-	ReasonThinkingSignature                         // thinking-signature budget exceeded
-	ReasonLongContextTier                           // long-context tier limit
+	ReasonUnknown           FailoverReason = iota + 1 // 规范八：枚举从 1 开始
+	ReasonAuth                                        // 401/403 transient auth
+	ReasonAuthPermanent                               // auth failed after refresh
+	ReasonBilling                                     // 402 / credit exhaustion
+	ReasonRateLimit                                   // 429 / throttling
+	ReasonOverloaded                                  // 503/529 server overloaded
+	ReasonServerError                                 // 500/502 internal error
+	ReasonTimeout                                     // connection/read timeout
+	ReasonContextOverflow                             // context too large
+	ReasonModelNotFound                               // 404 / invalid model
+	ReasonFormatError                                 // 400 bad request
+	ReasonThinkingSignature                           // thinking-signature budget exceeded
+	ReasonLongContextTier                             // long-context tier limit
 )
 
 // String returns the human-readable reason name.

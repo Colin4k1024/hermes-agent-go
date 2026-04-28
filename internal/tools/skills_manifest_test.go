@@ -250,7 +250,7 @@ func TestSyncBuiltinSkills_ManifestCreated(t *testing.T) {
 
 	// Create a bundled skill.
 	skillDir := filepath.Join(bundledDir, "alpha")
-	os.MkdirAll(skillDir, 0755)                                                     //nolint:errcheck
+	os.MkdirAll(skillDir, 0755)                                                   //nolint:errcheck
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Alpha v1"), 0644) //nolint:errcheck
 
 	results, err := SyncBuiltinSkills(bundledDir, installedDir)
@@ -285,7 +285,7 @@ func TestSyncBuiltinSkills_SkipsUserModified(t *testing.T) {
 
 	// Create a bundled skill.
 	skillDir := filepath.Join(bundledDir, "beta")
-	os.MkdirAll(skillDir, 0755)                                                    //nolint:errcheck
+	os.MkdirAll(skillDir, 0755)                                                  //nolint:errcheck
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Beta v1"), 0644) //nolint:errcheck
 
 	// Sync it once.

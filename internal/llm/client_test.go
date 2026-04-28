@@ -50,8 +50,8 @@ func TestNewClientNoKey(t *testing.T) {
 
 func TestNewClientFromConfig(t *testing.T) {
 	cfg := &config.Config{
-		Model:  "test-model",
-		APIKey: "test-key",
+		Model:   "test-model",
+		APIKey:  "test-key",
 		BaseURL: "https://test.com/v1",
 	}
 	c, err := NewClient(cfg)

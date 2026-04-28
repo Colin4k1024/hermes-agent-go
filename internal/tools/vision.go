@@ -196,7 +196,7 @@ func callVisionLLM(client *llm.Client, imageContent, prompt string) (string, err
 	// The OpenAI vision format uses content as an array of parts
 	messages := []llm.Message{
 		{
-			Role: "user",
+			Role:    "user",
 			Content: prompt,
 			// Embed image URL in the content for models that support it
 			ImageURLs: []string{imageContent},

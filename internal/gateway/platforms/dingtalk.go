@@ -136,14 +136,14 @@ func (d *DingTalkAdapter) computeSign(timestamp string) string {
 }
 
 type dingtalkCallbackPayload struct {
-	MsgType           string `json:"msgtype"`
-	Text              struct{ Content string } `json:"text"`
-	SenderID          string `json:"senderId"`
-	SenderNick        string `json:"senderNick"`
-	ConversationID    string `json:"conversationId"`
-	ConversationType  string `json:"conversationType"` // "1"=dm, "2"=group
+	MsgType           string                        `json:"msgtype"`
+	Text              struct{ Content string }      `json:"text"`
+	SenderID          string                        `json:"senderId"`
+	SenderNick        string                        `json:"senderNick"`
+	ConversationID    string                        `json:"conversationId"`
+	ConversationType  string                        `json:"conversationType"` // "1"=dm, "2"=group
 	AtUsers           []struct{ DingtalkID string } `json:"atUsers"`
-	ConversationTitle string `json:"conversationTitle"`
+	ConversationTitle string                        `json:"conversationTitle"`
 }
 
 func (d *DingTalkAdapter) handleCallback(w http.ResponseWriter, r *http.Request) {

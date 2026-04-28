@@ -103,7 +103,7 @@ func (s *SignalAdapter) receiveLoop() {
 			var msg struct {
 				Envelope struct {
 					Source      string `json:"source"`
-					SourceName string `json:"sourceName"`
+					SourceName  string `json:"sourceName"`
 					DataMessage *struct {
 						Message   string `json:"message"`
 						GroupInfo *struct {

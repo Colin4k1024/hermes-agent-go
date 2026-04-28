@@ -47,7 +47,9 @@ func (m *MattermostAdapter) Connect(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	var user struct{ ID string `json:"id"` }
+	var user struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(resp.Body).Decode(&user)
 	m.botUserID = user.ID
 
@@ -83,7 +85,9 @@ func (m *MattermostAdapter) Send(ctx context.Context, chatID string, text string
 	}
 	defer resp.Body.Close()
 
-	var post struct{ ID string `json:"id"` }
+	var post struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(resp.Body).Decode(&post)
 	return &gateway.SendResult{Success: true, MessageID: post.ID}, nil
 }

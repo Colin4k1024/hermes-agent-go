@@ -79,9 +79,9 @@ func (v Verdict) String() string {
 type InstallDecision int
 
 const (
-	InstallAllow       InstallDecision = iota // Proceed without prompt
-	InstallPromptUser                         // Ask the user for confirmation
-	InstallBlock                              // Refuse to install
+	InstallAllow      InstallDecision = iota // Proceed without prompt
+	InstallPromptUser                        // Ask the user for confirmation
+	InstallBlock                             // Refuse to install
 )
 
 // String returns the human-readable name for an InstallDecision.

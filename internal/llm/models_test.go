@@ -65,8 +65,8 @@ func TestGetModelMeta_AllKnownModels(t *testing.T) {
 
 func TestGetModelMeta_SpecificModels(t *testing.T) {
 	tests := []struct {
-		model         string
-		context       int
+		model          string
+		context        int
 		supportsVision bool
 	}{
 		{"openai/gpt-4o", 128000, true},

@@ -26,7 +26,7 @@ func (s *quotaSessionStore) List(_ context.Context, _ string, _ store.ListOption
 	}
 	return nil, s.count, nil
 }
-func (s *quotaSessionStore) Delete(_ context.Context, _, _ string) error                  { return nil }
+func (s *quotaSessionStore) Delete(_ context.Context, _, _ string) error { return nil }
 func (s *quotaSessionStore) UpdateTokens(_ context.Context, _, _ string, _ store.TokenDelta) error {
 	return nil
 }

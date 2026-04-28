@@ -16,10 +16,10 @@ import (
 
 // HubSource represents a skill source for discovery.
 type HubSource struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"` // "github", "url", "local"
-	URL     string `json:"url"`
-	Trust   string `json:"trust"` // "builtin", "trusted", "community"
+	Name  string `json:"name"`
+	Type  string `json:"type"` // "github", "url", "local"
+	URL   string `json:"url"`
+	Trust string `json:"trust"` // "builtin", "trusted", "community"
 }
 
 // HubSkill represents a skill available from a hub.

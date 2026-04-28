@@ -26,12 +26,12 @@ type PlatformState struct {
 type RuntimeStatus struct {
 	mu sync.RWMutex
 
-	StartedAt     string                   `json:"started_at"`
-	Uptime        string                   `json:"uptime"`
-	Platforms     map[string]PlatformState `json:"platforms"`
-	TotalMessages int64                    `json:"total_messages"`
-	ActiveSessions int                     `json:"active_sessions"`
-	LastUpdated   string                   `json:"last_updated"`
+	StartedAt      string                   `json:"started_at"`
+	Uptime         string                   `json:"uptime"`
+	Platforms      map[string]PlatformState `json:"platforms"`
+	TotalMessages  int64                    `json:"total_messages"`
+	ActiveSessions int                      `json:"active_sessions"`
+	LastUpdated    string                   `json:"last_updated"`
 
 	// Internal tracking (not serialized).
 	startTime time.Time `json:"-"`

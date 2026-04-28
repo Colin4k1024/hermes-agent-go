@@ -64,8 +64,8 @@ func handleSessionSearch(args map[string]any, ctx *ToolContext) string {
 	results, err := db.SearchMessages(query, limit)
 	if err != nil {
 		return toJSON(map[string]any{
-			"error":   fmt.Sprintf("Search failed: %v", err),
-			"hint":    "FTS5 may not be available. Try a simpler query.",
+			"error": fmt.Sprintf("Search failed: %v", err),
+			"hint":  "FTS5 may not be available. Try a simpler query.",
 		})
 	}
 

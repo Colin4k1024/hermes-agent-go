@@ -99,10 +99,10 @@ func TestExtractMediaFromContent_NoMedia(t *testing.T) {
 
 func TestClassifyMediaFile(t *testing.T) {
 	tests := []struct {
-		path     string
-		isVoice  bool
-		isImage  bool
-		isDoc    bool
+		path    string
+		isVoice bool
+		isImage bool
+		isDoc   bool
 	}{
 		{"/path/file.ogg", true, false, false},
 		{"/path/file.mp3", true, false, false},
@@ -881,9 +881,9 @@ type mockAdapter struct {
 	platform Platform
 }
 
-func (m *mockAdapter) Platform() Platform { return m.platform }
+func (m *mockAdapter) Platform() Platform                { return m.platform }
 func (m *mockAdapter) Connect(ctx context.Context) error { return nil }
-func (m *mockAdapter) Disconnect() error { return nil }
+func (m *mockAdapter) Disconnect() error                 { return nil }
 func (m *mockAdapter) Send(ctx context.Context, chatID string, text string, metadata map[string]string) (*SendResult, error) {
 	return &SendResult{Success: true}, nil
 }
@@ -898,7 +898,7 @@ func (m *mockAdapter) SendDocument(ctx context.Context, chatID string, filePath 
 	return &SendResult{Success: true}, nil
 }
 func (m *mockAdapter) OnMessage(handler func(event *MessageEvent)) {}
-func (m *mockAdapter) IsConnected() bool { return true }
+func (m *mockAdapter) IsConnected() bool                           { return true }
 
 // --- splitMessage tests ---
 

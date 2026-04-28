@@ -139,21 +139,21 @@ func (t *geminiHTTPTransport) ChatStream(ctx context.Context, req ChatRequest) (
 // --- Gemini API types (inline) ---
 
 type geminiInlineRequest struct {
-	Contents          []geminiInlineContent    `json:"contents"`
-	Tools             []geminiInlineToolDecl   `json:"tools,omitempty"`
-	SystemInstruction *geminiInlineContent     `json:"systemInstruction,omitempty"`
-	GenerationConfig  *geminiInlineGenCfg      `json:"generationConfig,omitempty"`
+	Contents          []geminiInlineContent  `json:"contents"`
+	Tools             []geminiInlineToolDecl `json:"tools,omitempty"`
+	SystemInstruction *geminiInlineContent   `json:"systemInstruction,omitempty"`
+	GenerationConfig  *geminiInlineGenCfg    `json:"generationConfig,omitempty"`
 }
 
 type geminiInlineContent struct {
-	Role  string              `json:"role,omitempty"`
-	Parts []geminiInlinePart  `json:"parts"`
+	Role  string             `json:"role,omitempty"`
+	Parts []geminiInlinePart `json:"parts"`
 }
 
 type geminiInlinePart struct {
-	Text             string                   `json:"text,omitempty"`
-	FunctionCall     *geminiInlineFuncCall     `json:"functionCall,omitempty"`
-	FunctionResponse *geminiInlineFuncResp     `json:"functionResponse,omitempty"`
+	Text             string                `json:"text,omitempty"`
+	FunctionCall     *geminiInlineFuncCall `json:"functionCall,omitempty"`
+	FunctionResponse *geminiInlineFuncResp `json:"functionResponse,omitempty"`
 }
 
 type geminiInlineFuncCall struct {
@@ -182,8 +182,8 @@ type geminiInlineGenCfg struct {
 }
 
 type geminiInlineResponse struct {
-	Candidates []geminiInlineCandidate `json:"candidates"`
-	UsageMetadata *geminiInlineUsage   `json:"usageMetadata,omitempty"`
+	Candidates    []geminiInlineCandidate `json:"candidates"`
+	UsageMetadata *geminiInlineUsage      `json:"usageMetadata,omitempty"`
 }
 
 type geminiInlineCandidate struct {

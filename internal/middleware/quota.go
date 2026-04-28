@@ -9,7 +9,7 @@ import (
 
 // QuotaConfig holds quota enforcement settings.
 type QuotaConfig struct {
-	Sessions store.SessionStore
+	Sessions      store.SessionStore
 	MaxSessionsFn func(tenantID string) int // returns max sessions for tenant
 }
 

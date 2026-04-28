@@ -92,7 +92,7 @@ func TestSkillManageCreate(t *testing.T) {
 
 	result := handleSkillManage(map[string]any{
 		"action":      "create",
-		"name":  "new-skill",
+		"name":        "new-skill",
 		"description": "A brand new skill",
 		"content":     "# New Skill\nDo stuff.",
 	}, nil)
@@ -119,8 +119,8 @@ func TestSkillManageDelete(t *testing.T) {
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Delete me"), 0644)
 
 	result := handleSkillManage(map[string]any{
-		"action":     "delete",
-		"name": "to-delete",
+		"action": "delete",
+		"name":   "to-delete",
 	}, nil)
 	var m map[string]any
 	json.Unmarshal([]byte(result), &m)

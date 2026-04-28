@@ -18,9 +18,9 @@ type SessionConfig struct {
 
 // GeneralConfig holds general gateway settings.
 type GeneralConfig struct {
-	Model         string `yaml:"model"`
-	MaxIterations int    `yaml:"max_iterations"`
-	AutoApprove   bool   `yaml:"auto_approve"`
+	Model         string  `yaml:"model"`
+	MaxIterations int     `yaml:"max_iterations"`
+	AutoApprove   bool    `yaml:"auto_approve"`
 	ToolDelay     float64 `yaml:"tool_delay"`
 }
 
@@ -68,7 +68,7 @@ func LoadGatewayConfig() (*GatewayConfigFile, error) {
 	if err == nil {
 		// Parse only the gateway/messaging sub-key.
 		var raw struct {
-			Gateway  *GatewayConfigFile `yaml:"gateway"`
+			Gateway   *GatewayConfigFile `yaml:"gateway"`
 			Messaging *GatewayConfigFile `yaml:"messaging"` // alternate key
 		}
 		if err := yaml.Unmarshal(data, &raw); err == nil {
@@ -82,18 +82,18 @@ func LoadGatewayConfig() (*GatewayConfigFile, error) {
 
 	// Overlay tokens from environment variables.
 	envTokens := map[string]string{
-		"telegram":     "TELEGRAM_BOT_TOKEN",
-		"discord":      "DISCORD_BOT_TOKEN",
-		"slack":        "SLACK_BOT_TOKEN",
-		"whatsapp":     "WHATSAPP_API_TOKEN",
-		"signal":       "SIGNAL_CLI_PATH",
-		"matrix":       "MATRIX_ACCESS_TOKEN",
-		"mattermost":   "MATTERMOST_TOKEN",
-		"dingtalk":     "DINGTALK_TOKEN",
-		"feishu":       "FEISHU_APP_ID",
-		"wecom":        "WECOM_CORP_ID",
-		"email":        "EMAIL_IMAP_HOST",
-		"sms":          "TWILIO_ACCOUNT_SID",
+		"telegram":   "TELEGRAM_BOT_TOKEN",
+		"discord":    "DISCORD_BOT_TOKEN",
+		"slack":      "SLACK_BOT_TOKEN",
+		"whatsapp":   "WHATSAPP_API_TOKEN",
+		"signal":     "SIGNAL_CLI_PATH",
+		"matrix":     "MATRIX_ACCESS_TOKEN",
+		"mattermost": "MATTERMOST_TOKEN",
+		"dingtalk":   "DINGTALK_TOKEN",
+		"feishu":     "FEISHU_APP_ID",
+		"wecom":      "WECOM_CORP_ID",
+		"email":      "EMAIL_IMAP_HOST",
+		"sms":        "TWILIO_ACCOUNT_SID",
 	}
 
 	for platformName, envKey := range envTokens {

@@ -72,7 +72,9 @@ func (m *MatrixAdapter) Send(ctx context.Context, chatID string, text string, _ 
 	}
 	defer resp.Body.Close()
 
-	var result struct{ EventID string `json:"event_id"` }
+	var result struct {
+		EventID string `json:"event_id"`
+	}
 	json.NewDecoder(resp.Body).Decode(&result)
 	return &gateway.SendResult{Success: true, MessageID: result.EventID}, nil
 }

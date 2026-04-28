@@ -538,10 +538,10 @@ func TestListModelAliases(t *testing.T) {
 
 func TestNewTrajectoryFromResult(t *testing.T) {
 	result := &ConversationResult{
-		Model:       "test-model",
-		Messages:    []llm.Message{{Role: "user", Content: "Hello"}},
-		Completed:   true,
-		InputTokens: 100,
+		Model:        "test-model",
+		Messages:     []llm.Message{{Role: "user", Content: "Hello"}},
+		Completed:    true,
+		InputTokens:  100,
 		OutputTokens: 50,
 	}
 

@@ -136,9 +136,9 @@ func gatewayCORS(next http.Handler) http.Handler {
 // --- OpenAI-compatible chat completions endpoint ---
 
 type chatCompletionRequest struct {
-	Model    string                   `json:"model"`
-	Messages []chatCompletionMessage  `json:"messages"`
-	Stream   bool                     `json:"stream"`
+	Model    string                  `json:"model"`
+	Messages []chatCompletionMessage `json:"messages"`
+	Stream   bool                    `json:"stream"`
 }
 
 type chatCompletionMessage struct {
