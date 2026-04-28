@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
           cache: true
 
       - name: Build
@@ -26,7 +26,7 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test ./... -count=1 -cover -timeout 120s
+        run: go test ./... -count=1 -timeout 120s
 
       - name: Race detection
         run: go test -race ./internal/agent/... ./internal/tools/... ./internal/gateway/... -count=1 -short -timeout 60s
@@ -40,7 +40,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
           cache: true
 
       - name: Check formatting
@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
           cache: true
 
       - name: Build

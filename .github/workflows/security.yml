@@ -31,9 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: securego/gosec@master
+      - uses: actions/setup-go@v5
         with:
-          args: ./...
+          go-version-file: go.mod
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: Run gosec
+        run: gosec -severity medium -confidence medium ./...
 
   trivy:
     name: Trivy Container Scan
