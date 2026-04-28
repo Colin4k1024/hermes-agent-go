@@ -70,9 +70,9 @@ type stubAPIKeyStore struct{}
 
 func (stubAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error                { return nil }
 func (stubAPIKeyStore) GetByHash(_ context.Context, _ string) (*store.APIKey, error)   { return nil, nil }
-func (stubAPIKeyStore) GetByID(_ context.Context, _ string) (*store.APIKey, error)     { return nil, nil }
+func (stubAPIKeyStore) GetByID(_ context.Context, _, _ string) (*store.APIKey, error)  { return nil, nil }
 func (stubAPIKeyStore) List(_ context.Context, _ string) ([]*store.APIKey, error)      { return nil, nil }
-func (stubAPIKeyStore) Revoke(_ context.Context, _ string) error                       { return nil }
+func (stubAPIKeyStore) Revoke(_ context.Context, _, _ string) error                    { return nil }
 
 // stubStore implements store.Store, returning stub sub-stores.
 type stubStore struct{}

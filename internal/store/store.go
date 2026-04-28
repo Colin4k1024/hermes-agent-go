@@ -69,9 +69,9 @@ type AuditListOptions struct {
 type APIKeyStore interface {
 	Create(ctx context.Context, key *APIKey) error
 	GetByHash(ctx context.Context, hash string) (*APIKey, error)
-	GetByID(ctx context.Context, id string) (*APIKey, error)
+	GetByID(ctx context.Context, tenantID, id string) (*APIKey, error)
 	List(ctx context.Context, tenantID string) ([]*APIKey, error)
-	Revoke(ctx context.Context, id string) error
+	Revoke(ctx context.Context, tenantID, id string) error
 }
 
 // ListOptions controls pagination and filtering for list queries.

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
@@ -143,30 +144,31 @@ func DefaultConfig() *Config {
 }
 
 var (
-	globalConfig *Config
-	configOnce   sync.Once
+	configPtr atomic.Pointer[Config]
+	configMu  sync.Mutex
 )
 
 // Load reads the configuration from disk, merging with defaults.
 func Load() *Config {
-	configOnce.Do(func() {
-		globalConfig = DefaultConfig()
-
-		// Load .env file (optional)
-		_ = godotenv.Load(filepath.Join(HermesHome(), ".env"))
-
-		// Load config.yaml (optional) — merge over defaults
-		if data, err := os.ReadFile(filepath.Join(HermesHome(), "config.yaml")); err == nil {
-			var fileConfig Config
-			if err := yaml.Unmarshal(data, &fileConfig); err == nil {
-				mergeConfig(globalConfig, &fileConfig)
-			}
+	if p := configPtr.Load(); p != nil {
+		return p
+	}
+	configMu.Lock()
+	defer configMu.Unlock()
+	if p := configPtr.Load(); p != nil {
+		return p
+	}
+	cfg := DefaultConfig()
+	_ = godotenv.Load(filepath.Join(HermesHome(), ".env"))
+	if data, err := os.ReadFile(filepath.Join(HermesHome(), "config.yaml")); err == nil {
+		var fileConfig Config
+		if err := yaml.Unmarshal(data, &fileConfig); err == nil {
+			mergeConfig(cfg, &fileConfig)
 		}
-
-		// Env var overrides (highest priority)
-		applyEnvOverrides(globalConfig)
-	})
-	return globalConfig
+	}
+	applyEnvOverrides(cfg)
+	configPtr.Store(cfg)
+	return cfg
 }
 
 func applyEnvOverrides(cfg *Config) {
@@ -228,9 +230,24 @@ func applyEnvOverrides(cfg *Config) {
 
 // Reload forces a config reload.
 func Reload() *Config {
-	configOnce = sync.Once{}
-	globalConfig = nil
-	return Load()
+	configMu.Lock()
+	cfg := DefaultConfig()
+	_ = godotenv.Load(filepath.Join(HermesHome(), ".env"))
+	if data, err := os.ReadFile(filepath.Join(HermesHome(), "config.yaml")); err == nil {
+		var fileConfig Config
+		if err := yaml.Unmarshal(data, &fileConfig); err == nil {
+			mergeConfig(cfg, &fileConfig)
+		}
+	}
+	applyEnvOverrides(cfg)
+	configPtr.Store(cfg)
+	configMu.Unlock()
+	return cfg
+}
+
+// InvalidateConfig clears the cached config so the next Load() re-reads from disk.
+func InvalidateConfig() {
+	configPtr.Store(nil)
 }
 
 // Save writes the current configuration to disk.
@@ -242,7 +259,7 @@ func Save(cfg *Config) error {
 	}
 	// Atomic write: write to temp file then rename to prevent corruption
 	tmpPath := configPath + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return err
 	}
 	return os.Rename(tmpPath, configPath)

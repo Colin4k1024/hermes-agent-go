@@ -145,6 +145,12 @@ var migrations = []migration{
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 		UNIQUE(tenant_id, user_id)
 	)`},
+
+	// P3: Audit trail enrichment
+	{24, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_id TEXT`},
+	{25, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS status_code INT`},
+	{26, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS latency_ms INT`},
+	{27, `CREATE INDEX IF NOT EXISTS idx_audit_request ON audit_logs(request_id)`},
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {

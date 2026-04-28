@@ -11,6 +11,7 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/agent"
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
+	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 	"github.com/hermes-agent/hermes-agent-go/internal/skills"
 	"github.com/hermes-agent/hermes-agent-go/internal/tools"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,7 +66,7 @@ func NewRunner(gwCfg *GatewayConfig, pgPool *pgxpool.Pool) *Runner {
 	if pgPool != nil {
 		pgSessions := NewPGSessionStore(pgPool, DefaultTenantID)
 		if err := pgSessions.EnsureDefaultTenant(ctx); err != nil {
-			slog.Warn("Failed to ensure default tenant", "error", err)
+			slog.Warn("failed_to_ensure_default_tenant", "error", err)
 		}
 		sessions = pgSessions
 		slog.Info("Using PostgreSQL session store")
@@ -266,7 +267,7 @@ func (r *Runner) handleMessage(event *MessageEvent) {
 
 	// Check user authorization via pairing store.
 	if !r.pairing.IsUserAllowed(source.Platform, source.UserID) {
-		slog.Info("Unauthorized message rejected",
+		slog.Info("unauthorized_message_rejected",
 			"platform", source.Platform,
 			"user_id", source.UserID,
 		)
@@ -289,11 +290,16 @@ func (r *Runner) handleMessage(event *MessageEvent) {
 	// Get or create session.
 	sessionEntry := r.sessions.GetOrCreateSession(source, false)
 
-	slog.Info("Handling message",
+	// Create enriched logger for this message processing scope.
+	msgLogger := slog.With(
 		"platform", source.Platform,
-		"chat_id", source.ChatID,
+		"session_id", sessionEntry.SessionID,
 		"user", source.UserName,
-		"session", sessionEntry.SessionID,
+	)
+	msgCtx := observability.WithLogger(r.ctx, msgLogger)
+
+	msgLogger.Info("handling_message",
+		"chat_id", source.ChatID,
 		"text_len", len(event.Text),
 	)
 
@@ -311,7 +317,7 @@ func (r *Runner) handleMessage(event *MessageEvent) {
 			Message:    event.Text,
 		}
 		if err := r.hooks.FireHook(HookBeforeMessage, hookEvent); err != nil {
-			slog.Warn("Before message hook error", "error", err)
+			observability.ContextLogger(msgCtx).Warn("before_message_hook_error", "error", err)
 		}
 	}
 
@@ -322,7 +328,7 @@ func (r *Runner) handleMessage(event *MessageEvent) {
 	}
 
 	// Process through agent.
-	r.processWithAgent(event, sessionEntry)
+	r.processWithAgent(msgCtx, event, sessionEntry)
 }
 
 func (r *Runner) handleGatewayCommand(event *MessageEvent, session *SessionEntry) {
@@ -338,7 +344,7 @@ func (r *Runner) handleGatewayCommand(event *MessageEvent, session *SessionEntry
 	knownCommands := GetGatewayKnownCommands()
 	if !knownCommands[command] {
 		// Not a known command, treat as regular message.
-		r.processWithAgent(event, session)
+		r.processWithAgent(r.ctx, event, session)
 		return
 	}
 
@@ -430,11 +436,11 @@ func (r *Runner) handleGatewayCommand(event *MessageEvent, session *SessionEntry
 	}
 }
 
-func (r *Runner) processWithAgent(event *MessageEvent, session *SessionEntry) {
+func (r *Runner) processWithAgent(ctx context.Context, event *MessageEvent, session *SessionEntry) {
 	// Try to get or create a cached agent for this session.
 	ag, err := r.getOrCreateAgent(event, session)
 	if err != nil {
-		slog.Error("Failed to create agent", "error", err)
+		observability.ContextLogger(ctx).Error("failed_to_create_agent", "error", err, "session", session.SessionID)
 		adapter := r.GetAdapter(event.Source.Platform)
 		if adapter != nil {
 			adapter.Send(r.ctx, event.Source.ChatID, "Error: failed to initialize agent.", nil)
@@ -462,7 +468,7 @@ func (r *Runner) processWithAgent(event *MessageEvent, session *SessionEntry) {
 		result, err = ag.Chat(event.Text)
 	}
 	if err != nil {
-		slog.Error("Agent error", "error", err, "session", session.SessionID)
+		observability.ContextLogger(ctx).Error("agent_error", "error", err, "session", session.SessionID)
 		adapter := r.GetAdapter(event.Source.Platform)
 		if adapter != nil {
 			adapter.Send(r.ctx, event.Source.ChatID, "Error processing your message. Please try again.", nil)
@@ -480,7 +486,7 @@ func (r *Runner) processWithAgent(event *MessageEvent, session *SessionEntry) {
 
 	// Deliver response via delivery router.
 	if err := r.delivery.DeliverResponse(r.ctx, event.Source.ChatID, result, event.Source); err != nil {
-		slog.Error("Failed to deliver response", "error", err, "platform", event.Source.Platform)
+		observability.ContextLogger(ctx).Error("failed_to_deliver_response", "error", err, "platform", event.Source.Platform)
 	}
 
 	// Fire after_message hook.

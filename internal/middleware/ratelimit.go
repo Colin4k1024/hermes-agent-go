@@ -1,14 +1,15 @@
 package middleware
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
+	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 )
 
 // RateLimiter checks whether a request should be allowed.
@@ -55,7 +56,7 @@ func RateLimitMiddleware(cfg RateLimitConfig) Middleware {
 				var err error
 				allowed, remaining, err = cfg.Limiter.Allow(key, limit)
 				if err != nil {
-					slog.Warn("distributed rate limiter failed, falling back to local", "error", err)
+					observability.ContextLogger(r.Context()).Warn("distributed rate limiter failed, falling back to local", "error", err)
 					allowed, remaining = local.allow(key, limit)
 				}
 			} else {
@@ -76,10 +77,10 @@ func RateLimitMiddleware(cfg RateLimitConfig) Middleware {
 	}
 }
 
-// localLimiter is a simple in-memory sliding window fallback.
+// localLimiter is a simple in-memory sliding window fallback with bounded size.
 type localLimiter struct {
 	mu      sync.Mutex
-	buckets map[string]*bucket
+	buckets *lru.Cache[string, *bucket]
 }
 
 type bucket struct {
@@ -88,8 +89,11 @@ type bucket struct {
 	windowAt time.Time
 }
 
+const maxRateLimitBuckets = 10000
+
 func newLocalLimiter() *localLimiter {
-	return &localLimiter{buckets: make(map[string]*bucket)}
+	cache, _ := lru.New[string, *bucket](maxRateLimitBuckets)
+	return &localLimiter{buckets: cache}
 }
 
 func (l *localLimiter) allow(key string, limit int) (bool, int) {
@@ -97,9 +101,9 @@ func (l *localLimiter) allow(key string, limit int) (bool, int) {
 	defer l.mu.Unlock()
 
 	now := time.Now()
-	b, ok := l.buckets[key]
+	b, ok := l.buckets.Get(key)
 	if !ok || now.Sub(b.windowAt) >= time.Minute {
-		l.buckets[key] = &bucket{count: 1, limit: limit, windowAt: now}
+		l.buckets.Add(key, &bucket{count: 1, limit: limit, windowAt: now})
 		return true, limit - 1
 	}
 

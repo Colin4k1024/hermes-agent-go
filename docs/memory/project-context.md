@@ -2,48 +2,47 @@
 | 字段 | 值 |
 |------|-----|
 | 项目名 | hermes-agent-go |
-| 当前任务 | `2026-04-28-saas-readiness` |
-| 阶段 | `released` (P0-P7 代码交付完成，有条件放行) |
+| 当前任务 | `2026-04-28-saas-hardening-fixes` |
+| 阶段 | `closed` |
 | 更新时间 | 2026-04-28 |
 
 ---
 
 ## Tech Stack
 
-- Go 1.21+
-- PostgreSQL (primary store, pgx/v5)
-- SQLite (local dev store)
-- Redis (session lock existing, rate limit planned)
-- golang-jwt/jwt/v5 (JWT RS256 验证)
-- prometheus/client_golang (可观测性指标)
-- Helm chart (Kubernetes 部署)
+- Go 1.25.0
+- PostgreSQL (primary store, pgx/v5, migration v27)
+- SQLite (local dev store, noop for SaaS features)
+- Redis (session lock, rate limit fallback)
+- OpenTelemetry (otel SDK + OTLP gRPC exporter)
+- Prometheus (client_golang v1.23.2, HTTP + LLM + PG metrics)
+- hashicorp/golang-lru/v2 v2.0.7 (rate limiter)
+- golang-jwt/jwt/v5 (JWT RS256)
+- Helm chart (Kubernetes)
 - Docker Compose (local dev)
-- http.NewServeMux (routing, 2 separate servers: ACP + API)
 
 ## 当前任务
 
-SaaS Readiness Phase 0-7 全量交付完成。Phase 7 补充了 SPA 修复（index.html + multi-select bug）和新增测试（metrics/middleware 8 cases + server integration 9 cases + openapi 5 cases）。`seedDefaultTenant` 编译错误已修复。18 个测试包全部通过。
+SaaS Hardening 完成 — 14 项修复 + 1 项设计 + 10 项 review 修复。
+26 files, +442/-167 lines。Security + code review 通过。
 
 ## 依赖
 
-- Phase 0-2 SaaS 无状态化已交付（`2026-04-27-saas-stateless`, CLOSED）
-- Redis 已集成用于 session lock
-- PG migration 已版本化（T0a 完成）
-- K8s 集群信息待 devops 提供（部署前需要）
-- golang-jwt/jwt/v5 和 prometheus/client_golang 已加入 go.mod
+- SaaS Readiness P0-P7 已全量交付
+- PG migration baseline: v27 (audit_logs enrichment)
+- OTel SDK 已加入 go.mod
+- hashicorp/golang-lru/v2 已升为 direct dep
 
 ## 风险
 
-- R1: CRIT-1 ACP auth bypass — pre-existing code, `HERMES_ACP_TOKEN` 未设置时全放行，生产部署前必须修复
-- R2: Middleware chain 已构建但未挂载到 HTTP server — 需独立 PR 完成
-- R3: 部分 store 层缺少单元测试（middleware/api 已基本覆盖）
-- R4: Redis 分布式限流未对接 — localLimiter 单副本可用，多副本需 Redis
-- R5: Helm secrets 以明文环境变量注入 — 生产需 ExternalSecrets
+- R1: Prometheus tenant_id 标签高基数 — accepted, bounded tenant set
+- R2: 非 HTTP 路径 slog 未迁移 — LOW, 渐进迁移
+- R3: LLM credential 加密未实现 — 设计就绪, 待计费系统
 
 ## 下一步
 
-1. **CRIT-1 修复**：`internal/acp/auth.go` 强制 `HERMES_ACP_TOKEN` 校验（生产阻塞项）
-2. **Middleware chain 挂载**：将 chain.go 连接到 HTTP server（独立 PR）
-3. **Redis 限流对接**：分布式 rate limiter 实际连接
-4. **Helm 加固**：ExternalSecrets、SecurityContext、Ingress、HPA、PDB
-5. **Admin SPA 部署**：配置 API server 的 `StaticDir`（指向 `internal/dashboard/static/`）并启用 `AllowedOrigins`
+1. **Commit + Push** — 当前变更待提交到 GitHub
+2. **Prometheus cardinality guard** — 添加 _overflow fallback
+3. **E2E integration test** — docker-compose + PG + Redis + Jaeger
+4. **LLM credential encryption** — 按设计文档实现
+5. **CLI slog migration** — 非 HTTP 路径渐进迁移

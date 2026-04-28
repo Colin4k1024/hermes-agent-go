@@ -46,12 +46,12 @@ func (n *noopAPIKeyStore) Create(_ context.Context, _ *store.APIKey) error { ret
 func (n *noopAPIKeyStore) GetByHash(_ context.Context, _ string) (*store.APIKey, error) {
 	return nil, errSQLiteUnsupported
 }
-func (n *noopAPIKeyStore) GetByID(_ context.Context, _ string) (*store.APIKey, error) {
+func (n *noopAPIKeyStore) GetByID(_ context.Context, _, _ string) (*store.APIKey, error) {
 	return nil, errSQLiteUnsupported
 }
 func (n *noopAPIKeyStore) List(_ context.Context, _ string) ([]*store.APIKey, error) {
 	return nil, errSQLiteUnsupported
 }
-func (n *noopAPIKeyStore) Revoke(_ context.Context, _ string) error { return errSQLiteUnsupported }
+func (n *noopAPIKeyStore) Revoke(_ context.Context, _, _ string) error { return errSQLiteUnsupported }
 
 var _ store.APIKeyStore = (*noopAPIKeyStore)(nil)

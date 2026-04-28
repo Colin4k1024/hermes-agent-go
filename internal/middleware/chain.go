@@ -13,6 +13,9 @@ type StackConfig struct {
 	RateLimit Middleware
 	RequestID Middleware
 	Metrics   Middleware
+	Logging   Middleware
+	Audit     Middleware
+	Tracing   Middleware
 }
 
 // MiddlewareStack enforces a fixed middleware ordering across all HTTP servers.
@@ -28,14 +31,21 @@ func NewStack(cfg StackConfig) *MiddlewareStack {
 }
 
 // Wrap applies the full middleware chain to the given handler.
+// Execution order (outermost first):
+//   Tracing → Metrics → RequestID → Auth → Tenant → Logging → Audit → RBAC → RateLimit → Handler
+// Logging runs after Auth+Tenant so it can enrich the logger with tenant_id.
+// Auth errors use ContextLogger fallback (slog.Default with request_id from RequestID middleware).
 func (s *MiddlewareStack) Wrap(handler http.Handler) http.Handler {
 	h := handler
 	h = apply(s.cfg.RateLimit, h)
 	h = apply(s.cfg.RBAC, h)
+	h = apply(s.cfg.Audit, h)
+	h = apply(s.cfg.Logging, h) // after Auth+Tenant so tenant_id is available
 	h = apply(s.cfg.Tenant, h)
 	h = apply(s.cfg.Auth, h)
 	h = apply(s.cfg.RequestID, h)
 	h = apply(s.cfg.Metrics, h)
+	h = apply(s.cfg.Tracing, h)
 	return h
 }
 

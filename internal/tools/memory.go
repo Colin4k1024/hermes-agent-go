@@ -77,6 +77,8 @@ var getMemoryProviderName = func() string {
 // SetMemoryProviderNameFunc allows the agent package to inject the config
 // reader without creating an import cycle.
 func SetMemoryProviderNameFunc(fn func() string) {
+	activeProviderMu.Lock()
+	defer activeProviderMu.Unlock()
 	getMemoryProviderName = fn
 }
 

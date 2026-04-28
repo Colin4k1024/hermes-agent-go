@@ -109,16 +109,15 @@ func (h *APIKeyHandler) list(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIKeyHandler) revoke(w http.ResponseWriter, r *http.Request, id string) {
 	tenantID := middleware.TenantFromContext(r.Context())
-	key, err := h.store.GetByID(r.Context(), id)
-	if err != nil {
+	if tenantID == "" {
+		http.Error(w, "tenant context required", http.StatusBadRequest)
+		return
+	}
+	if _, err := h.store.GetByID(r.Context(), tenantID, id); err != nil {
 		http.Error(w, "key not found", http.StatusNotFound)
 		return
 	}
-	if key.TenantID != tenantID {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	if err := h.store.Revoke(r.Context(), id); err != nil {
+	if err := h.store.Revoke(r.Context(), tenantID, id); err != nil {
 		http.Error(w, "revoke failed", http.StatusInternalServerError)
 		return
 	}

@@ -30,7 +30,7 @@ func (m *mockAPIKeyStore) GetByHash(_ context.Context, hash string) (*store.APIK
 	return key, nil
 }
 
-func (m *mockAPIKeyStore) GetByID(_ context.Context, _ string) (*store.APIKey, error) {
+func (m *mockAPIKeyStore) GetByID(_ context.Context, _, _ string) (*store.APIKey, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -38,7 +38,7 @@ func (m *mockAPIKeyStore) List(_ context.Context, _ string) ([]*store.APIKey, er
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockAPIKeyStore) Revoke(_ context.Context, _ string) error {
+func (m *mockAPIKeyStore) Revoke(_ context.Context, _, _ string) error {
 	return errors.New("not implemented")
 }
 

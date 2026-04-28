@@ -35,11 +35,11 @@ func (s *pgAPIKeyStore) GetByHash(ctx context.Context, hash string) (*store.APIK
 	return k, nil
 }
 
-func (s *pgAPIKeyStore) GetByID(ctx context.Context, id string) (*store.APIKey, error) {
+func (s *pgAPIKeyStore) GetByID(ctx context.Context, tenantID, id string) (*store.APIKey, error) {
 	k := &store.APIKey{}
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, tenant_id, name, key_hash, prefix, roles, expires_at, revoked_at, created_at FROM api_keys WHERE id = $1`,
-		id,
+		`SELECT id, tenant_id, name, key_hash, prefix, roles, expires_at, revoked_at, created_at FROM api_keys WHERE tenant_id = $1 AND id = $2`,
+		tenantID, id,
 	).Scan(&k.ID, &k.TenantID, &k.Name, &k.KeyHash, &k.Prefix, &k.Roles, &k.ExpiresAt, &k.RevokedAt, &k.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get api key by id: %w", err)
@@ -71,8 +71,8 @@ func (s *pgAPIKeyStore) List(ctx context.Context, tenantID string) ([]*store.API
 	return keys, nil
 }
 
-func (s *pgAPIKeyStore) Revoke(ctx context.Context, id string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE api_keys SET revoked_at = now() WHERE id = $1`, id)
+func (s *pgAPIKeyStore) Revoke(ctx context.Context, tenantID, id string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE api_keys SET revoked_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id)
 	if err != nil {
 		return fmt.Errorf("revoke api key: %w", err)
 	}

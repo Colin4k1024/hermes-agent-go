@@ -15,8 +15,9 @@ type Profile struct {
 }
 
 var (
-	activeProfile     string
-	activeProfileOnce sync.Once
+	activeProfile       string
+	activeProfileLoaded bool
+	profileMu           sync.RWMutex
 )
 
 // ListProfiles returns all available profiles.
@@ -49,9 +50,21 @@ func ListProfiles() []Profile {
 // GetActiveProfile returns the name of the currently active profile.
 // Returns "" for the default profile.
 func GetActiveProfile() string {
-	activeProfileOnce.Do(func() {
-		activeProfile = loadActiveProfile()
-	})
+	profileMu.RLock()
+	if activeProfileLoaded {
+		p := activeProfile
+		profileMu.RUnlock()
+		return p
+	}
+	profileMu.RUnlock()
+
+	profileMu.Lock()
+	defer profileMu.Unlock()
+	if activeProfileLoaded {
+		return activeProfile
+	}
+	activeProfile = loadActiveProfile()
+	activeProfileLoaded = true
 	return activeProfile
 }
 
@@ -68,13 +81,12 @@ func SetActiveProfile(name string) error {
 	markerPath := filepath.Join(defaultHermesHome(), "active_profile")
 
 	if name == "" || name == "default" {
-		// Remove the marker to revert to default.
 		os.Remove(markerPath)
+		profileMu.Lock()
 		activeProfile = ""
-		activeProfileOnce = sync.Once{}
-		// Reset config singleton so next Load() picks up new home.
-		configOnce = sync.Once{}
-		globalConfig = nil
+		activeProfileLoaded = true
+		profileMu.Unlock()
+		InvalidateConfig()
 		return nil
 	}
 
@@ -82,11 +94,11 @@ func SetActiveProfile(name string) error {
 		return fmt.Errorf("write active_profile: %w", err)
 	}
 
+	profileMu.Lock()
 	activeProfile = name
-	activeProfileOnce = sync.Once{}
-	// Reset config singleton.
-	configOnce = sync.Once{}
-	globalConfig = nil
+	activeProfileLoaded = true
+	profileMu.Unlock()
+	InvalidateConfig()
 	return nil
 }
 
@@ -190,12 +202,12 @@ var profileOverride string
 // OverrideActiveProfile sets the profile for this process, overriding the
 // marker file. Call this early, before any HermesHome() / Load() calls.
 func OverrideActiveProfile(name string) {
+	profileMu.Lock()
 	profileOverride = name
-	activeProfileOnce = sync.Once{}
 	activeProfile = ""
-	// Reset config singleton.
-	configOnce = sync.Once{}
-	globalConfig = nil
+	activeProfileLoaded = false
+	profileMu.Unlock()
+	InvalidateConfig()
 }
 
 // init patches HermesHome to be profile-aware.

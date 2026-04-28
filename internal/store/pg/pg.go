@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,9 +26,15 @@ type PGStore struct {
 	apiKeys   *pgAPIKeyStore
 }
 
-// New creates a PGStore with a connection pool.
+// New creates a PGStore with a connection pool and query tracing.
 func New(ctx context.Context, databaseURL string) (*PGStore, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	poolCfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("pg parse config: %w", err)
+	}
+	poolCfg.ConnConfig.Tracer = &observability.PGXTracer{}
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("pg connect: %w", err)
 	}

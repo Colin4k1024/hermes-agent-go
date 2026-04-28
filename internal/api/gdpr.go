@@ -3,10 +3,10 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
+	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
 
@@ -58,7 +58,7 @@ func (h *GDPRHandler) ExportHandler() http.HandlerFunc {
 			}
 			msgs, err := h.messages.List(r.Context(), tenantID, sess.ID, 1000, 0)
 			if err != nil {
-				slog.Warn("gdpr export: failed to list messages", "session_id", sess.ID, "error", err)
+				observability.ContextLogger(r.Context()).Warn("gdpr export: failed to list messages", "session_id", sess.ID, "error", err)
 				msgs = nil
 			}
 			enc.Encode(sessionExport{Session: sess, Messages: msgs})
@@ -90,7 +90,7 @@ func (h *GDPRHandler) DeleteHandler() http.HandlerFunc {
 		var errs []error
 		for _, sess := range sessions {
 			if err := h.sessions.Delete(r.Context(), tenantID, sess.ID); err != nil {
-				slog.Error("gdpr delete: failed to delete session", "session_id", sess.ID, "error", err)
+				observability.ContextLogger(r.Context()).Error("gdpr delete: failed to delete session", "session_id", sess.ID, "error", err)
 				errs = append(errs, err)
 			}
 		}

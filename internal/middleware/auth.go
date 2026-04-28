@@ -15,7 +15,11 @@ func AuthMiddleware(chain *auth.ExtractorChain, allowAnonymous bool) Middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ac, err := chain.Extract(r)
 			if err != nil {
-				slog.Warn("auth extraction failed", "error", err, "remote", r.RemoteAddr)
+				slog.Warn("auth_extraction_failed",
+					"error", err,
+					"remote", r.RemoteAddr,
+					"request_id", RequestIDFromContext(r.Context()),
+				)
 				http.Error(w, "authentication failed", http.StatusUnauthorized)
 				return
 			}

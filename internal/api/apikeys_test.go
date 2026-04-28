@@ -42,9 +42,9 @@ func (m *mockAPIKeyStore) GetByHash(_ context.Context, hash string) (*store.APIK
 	return nil, fmt.Errorf("not found")
 }
 
-func (m *mockAPIKeyStore) GetByID(_ context.Context, id string) (*store.APIKey, error) {
+func (m *mockAPIKeyStore) GetByID(_ context.Context, tenantID, id string) (*store.APIKey, error) {
 	k, ok := m.keys[id]
-	if !ok {
+	if !ok || k.TenantID != tenantID {
 		return nil, fmt.Errorf("not found")
 	}
 	return k, nil
@@ -60,9 +60,9 @@ func (m *mockAPIKeyStore) List(_ context.Context, tenantID string) ([]*store.API
 	return result, nil
 }
 
-func (m *mockAPIKeyStore) Revoke(_ context.Context, id string) error {
+func (m *mockAPIKeyStore) Revoke(_ context.Context, tenantID, id string) error {
 	k, ok := m.keys[id]
-	if !ok {
+	if !ok || k.TenantID != tenantID {
 		return fmt.Errorf("not found")
 	}
 	now := time.Now()

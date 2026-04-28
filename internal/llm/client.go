@@ -8,10 +8,27 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
+	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 	openai "github.com/sashabaranov/go-openai"
 )
+
+type llmTenantKey struct{}
+
+// WithTenantID stores a tenant ID in context for LLM observability.
+func WithTenantID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, llmTenantKey{}, id)
+}
+
+func tenantIDFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(llmTenantKey{}).(string)
+	if v == "" {
+		return "local"
+	}
+	return v
+}
 
 // APIMode determines which API protocol to use.
 type APIMode string
@@ -207,12 +224,90 @@ type StreamDelta struct {
 
 // CreateChatCompletion sends a non-streaming chat completion request.
 func (c *Client) CreateChatCompletion(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
-	return c.transport.Chat(ctx, req)
+	start := time.Now()
+	resp, err := c.transport.Chat(ctx, req)
+	elapsed := time.Since(start)
+
+	tenantID := tenantIDFromContext(ctx)
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
+
+	attrs := []any{
+		"model", c.model,
+		"tenant_id", tenantID,
+		"latency_ms", elapsed.Milliseconds(),
+		"error", errMsg,
+	}
+	if resp != nil {
+		attrs = append(attrs,
+			"input_tokens", resp.Usage.PromptTokens,
+			"output_tokens", resp.Usage.CompletionTokens,
+			"cache_read_tokens", resp.Usage.CacheReadTokens,
+		)
+		llmTokensTotal.WithLabelValues(c.model, tenantID, "input").Add(float64(resp.Usage.PromptTokens))
+		llmTokensTotal.WithLabelValues(c.model, tenantID, "output").Add(float64(resp.Usage.CompletionTokens))
+	}
+	llmRequestDuration.WithLabelValues(c.model, tenantID).Observe(elapsed.Seconds())
+	observability.ContextLogger(ctx).Info("llm_call", attrs...)
+
+	return resp, err
 }
 
 // CreateChatCompletionStream sends a streaming chat completion request.
+// Wraps the underlying transport stream with timing and token metrics.
 func (c *Client) CreateChatCompletionStream(ctx context.Context, req ChatRequest) (<-chan StreamDelta, <-chan error) {
-	return c.transport.ChatStream(ctx, req)
+	start := time.Now()
+	tenantID := tenantIDFromContext(ctx)
+	deltaCh, errCh := c.transport.ChatStream(ctx, req)
+
+	if deltaCh == nil && errCh == nil {
+		ch := make(chan StreamDelta)
+		close(ch)
+		ech := make(chan error)
+		close(ech)
+		return ch, ech
+	}
+
+	bufSize := 0
+	if deltaCh != nil {
+		bufSize = cap(deltaCh)
+	}
+	wrappedDelta := make(chan StreamDelta, bufSize)
+	wrappedErr := make(chan error, 1)
+
+	go func() {
+		defer close(wrappedDelta)
+		defer close(wrappedErr)
+		var lastErr error
+		if deltaCh != nil {
+			for d := range deltaCh {
+				wrappedDelta <- d
+			}
+		}
+		if errCh != nil {
+			for e := range errCh {
+				lastErr = e
+				wrappedErr <- e
+			}
+		}
+		elapsed := time.Since(start)
+		llmRequestDuration.WithLabelValues(c.model, tenantID).Observe(elapsed.Seconds())
+
+		errMsg := ""
+		if lastErr != nil {
+			errMsg = lastErr.Error()
+		}
+		observability.ContextLogger(ctx).Info("llm_call_stream",
+			"model", c.model,
+			"tenant_id", tenantID,
+			"latency_ms", elapsed.Milliseconds(),
+			"error", errMsg,
+		)
+	}()
+
+	return wrappedDelta, wrappedErr
 }
 
 // --- Internal transport implementations (kept in this file to avoid circular imports) ---

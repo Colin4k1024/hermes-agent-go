@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -13,9 +14,9 @@ var (
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "hermes_http_requests_total",
-			Help: "Total HTTP requests by method, path, and status code.",
+			Help: "Total HTTP requests by method, path, status code, and tenant.",
 		},
-		[]string{"method", "path", "status"},
+		[]string{"method", "path", "status", "tenant_id"},
 	)
 
 	httpRequestDuration = promauto.NewHistogramVec(
@@ -24,7 +25,7 @@ var (
 			Help:    "HTTP request latency in seconds.",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"method", "path"},
+		[]string{"method", "path", "tenant_id"},
 	)
 
 	httpRequestsInFlight = promauto.NewGauge(
@@ -48,9 +49,13 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 
 		duration := time.Since(start).Seconds()
 		path := normalizePath(r.URL.Path)
+		tenantID := "anonymous"
+		if ac, ok := auth.FromContext(r.Context()); ok && ac != nil && ac.TenantID != "" {
+			tenantID = ac.TenantID
+		}
 
-		httpRequestsTotal.WithLabelValues(r.Method, path, strconv.Itoa(sw.status)).Inc()
-		httpRequestDuration.WithLabelValues(r.Method, path).Observe(duration)
+		httpRequestsTotal.WithLabelValues(r.Method, path, strconv.Itoa(sw.status), tenantID).Inc()
+		httpRequestDuration.WithLabelValues(r.Method, path, tenantID).Observe(duration)
 	})
 }
 
