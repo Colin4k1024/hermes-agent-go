@@ -934,6 +934,20 @@ async function chatRound(user, session, msg, seed) {
 
 async function runConcurrentTest() {
   log('═══ Concurrent burst test ═══', 'info');
+
+  // Ensure all users are initialized first
+  await initAlice();
+  await initBob();
+  await initCharlie();
+  await initDiana();
+  await sleep(300);
+
+  if (!userState.alice?.apiKey || !userState.charlie?.apiKey) {
+    log('Init failed — cannot run concurrent test. Check Admin Token and API URL.', 'err');
+    setTest('concurrent', 'fail', 'Init failed — check Admin Token and API URL');
+    return;
+  }
+
   const ts = Date.now();
 
   // Use fresh sessions for concurrent test
