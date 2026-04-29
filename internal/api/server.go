@@ -31,6 +31,7 @@ type APIServerConfig struct {
 type APIServer struct {
 	cfg    APIServerConfig
 	server *http.Server
+	MockChat *mockChatHandler // accessible for testing/debugging
 }
 
 // spaFallback wraps the API mux: serves index.html for root "/" and admin.html,
@@ -43,7 +44,7 @@ func spaFallback(mux, spa http.Handler, staticDir string) http.Handler {
 			http.ServeFile(w, r, staticDir+"/index.html")
 			return
 		}
-		if path == "/admin.html" || path == "/index.html" {
+		if path == "/admin.html" || path == "/index.html" || path == "/isolation-test.html" {
 			http.ServeFile(w, r, staticDir+path)
 			return
 		}
@@ -114,6 +115,12 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	api.HandleFunc("GET /v1/gdpr/export", gdpr.ExportHandler())
 	api.HandleFunc("DELETE /v1/gdpr/data", gdpr.DeleteHandler())
 
+	// Mock chat endpoints for multi-tenant isolation testing.
+	mockChat := newMockChatHandler()
+	api.HandleFunc("POST /v1/chat/completions", mockChat.ServeHTTP)
+	api.HandleFunc("GET /v1/mock-sessions", mockChat.handleSessionList)
+	api.HandleFunc("DELETE /v1/mock-sessions/", mockChat.handleClearSession)
+
 	mux.Handle("/v1/", stack.Wrap(api))
 
 	// Static file serving (optional).
@@ -144,7 +151,8 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	}
 
 	s := &APIServer{
-		cfg: cfg,
+		cfg:      cfg,
+		MockChat: mockChat,
 		server: &http.Server{
 			Addr:         fmt.Sprintf("0.0.0.0:%d", cfg.Port),
 			Handler:      handler,

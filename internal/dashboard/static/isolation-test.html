@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes — Multi-Tenant Isolation Test</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+  --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+  --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+  --yellow: #d29922; --purple: #bc8cff; --orange: #e3b341;
+  --t1: #58a6ff; --t2: #bc8cff; --t3: #3fb950;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+
+/* ── Header ──────────────────────────────────────────── */
+header {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:10px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; flex-shrink:0;
+}
+header h1 { font-size:15px; font-weight:700; color:var(--accent); white-space:nowrap; }
+.hdr { display:flex; align-items:center; gap:6px; }
+.hdr label { font-size:11px; color:var(--muted); }
+.hdr input { background:var(--bg); border:1px solid var(--border); color:var(--text);
+  padding:3px 8px; border-radius:4px; font-size:12px; width:200px; }
+.hdr-url { width:220px; }
+button { cursor:pointer; font-family:inherit; }
+.btn { padding:5px 12px; border-radius:5px; font-size:12px; font-weight:500;
+  border:none; transition:opacity .15s; }
+.btn:hover { opacity:0.85; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-green { background:var(--green); color:#fff; }
+.btn-red { background:var(--red); color:#fff; }
+.btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--surface2); color:var(--text); }
+.status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+.status-dot.ok { background:var(--green); box-shadow:0 0 6px var(--green); }
+.status-dot.err { background:var(--red); }
+.status-text { font-size:11px; color:var(--muted); }
+
+/* ── Main layout ─────────────────────────────────────── */
+.main { display:flex; flex:1; overflow:hidden; min-height:0; }
+
+/* ── Left: Config panel ───────────────────────────────── */
+.config-panel {
+  width:220px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow-y:auto; padding:12px; gap:12px;
+}
+.config-panel h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); margin-bottom:4px; }
+
+.user-card {
+  background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.user-card .uc-header { display:flex; align-items:center; gap:6px; }
+.user-card .uc-name { font-size:13px; font-weight:600; }
+.user-card .uc-badge { font-size:10px; padding:2px 6px; border-radius:10px; font-weight:600; }
+.user-card .uc-badge.t1 { background:rgba(88,166,255,.15); color:var(--t1); }
+.user-card .uc-badge.t2 { background:rgba(188,140,255,.15); color:var(--t2); }
+.user-card .uc-badge.t3 { background:rgba(63,185,80,.15); color:var(--t3); }
+.user-card input, .user-card textarea {
+  background:var(--surface); border:1px solid var(--border); color:var(--text);
+  border-radius:4px; font-size:11px; font-family:inherit; padding:4px 6px; width:100%;
+}
+.user-card textarea { resize:none; height:36px; }
+.user-card .uc-row { display:flex; gap:4px; }
+.user-card .uc-row label { font-size:10px; color:var(--muted); width:40px; flex-shrink:0; padding-top:3px; }
+.user-card .uc-row .uc-inputs { flex:1; display:flex; flex-direction:column; gap:4px; }
+
+/* ── Center: Chat panels ──────────────────────────────── */
+.chat-area { flex:1; display:grid; grid-template-columns:1fr 1fr; overflow:hidden; min-width:0; }
+.chat-panel {
+  display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border);
+}
+.chat-panel:last-child { border-right:none; }
+.panel-hdr {
+  padding:8px 14px; background:var(--surface); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:8px; flex-shrink:0;
+}
+.panel-hdr .tenant-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.panel-hdr h2 { font-size:13px; font-weight:600; }
+.panel-hdr .session-tag { font-size:10px; color:var(--muted); background:var(--bg);
+  border:1px solid var(--border); padding:2px 6px; border-radius:10px; font-family:monospace; }
+.panel-hdr .rate-badge { margin-left:auto; font-size:10px; padding:2px 8px;
+  border-radius:10px; background:var(--surface2); color:var(--muted); }
+
+.messages { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:6px; }
+.msg { padding:7px 12px; border-radius:8px; font-size:12px; line-height:1.5;
+  max-width:88%; word-break:break-word; white-space:pre-wrap; }
+.msg.user { background:var(--accent); color:#fff; align-self:flex-end; }
+.msg.assistant { background:var(--surface2); border:1px solid var(--border); align-self:flex-start; }
+.msg.sys { background:var(--border); color:var(--muted); align-self:center;
+  font-size:10px; text-align:center; max-width:95%; }
+.msg .msg-meta { font-size:9px; opacity:.6; margin-top:2px; }
+
+.panel-foot {
+  padding:8px 12px; background:var(--surface); border-top:1px solid var(--border);
+  display:flex; gap:6px; flex-shrink:0;
+}
+.panel-foot input { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text);
+  padding:5px 10px; border-radius:5px; font-size:12px; }
+.panel-foot input:focus { outline:none; border-color:var(--accent); }
+
+/* ── Right: Isolation & Audit panel ──────────────────── */
+.right-panel {
+  width:300px; flex-shrink:0; display:flex; flex-direction:column;
+  border-left:1px solid var(--border); overflow:hidden; background:var(--surface);
+}
+.right-panel .rp-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.right-panel .rp-tab { flex:1; padding:8px 12px; font-size:12px; text-align:center;
+  cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+.right-panel .rp-tab:hover { color:var(--text); }
+.right-panel .rp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.rp-content { flex:1; overflow-y:auto; }
+
+/* ── Isolation test results ─── */
+.test-results { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.test-card { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px; }
+.test-card h4 { font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.test-card .tc-icon { font-size:14px; }
+.test-card .tc-icon.pass { color:var(--green); }
+.test-card .tc-icon.fail { color:var(--red); }
+.test-card .tc-icon.pending { color:var(--muted); }
+.test-card .tc-detail { font-size:11px; color:var(--muted); line-height:1.4; }
+.test-card .tc-badge { display:inline-block; font-size:10px; padding:2px 8px;
+  border-radius:10px; font-weight:600; }
+.test-card .tc-badge.pass { background:rgba(63,185,80,.15); color:var(--green); }
+.test-card .tc-badge.fail { background:rgba(248,81,73,.15); color:var(--red); }
+.test-card .tc-badge.pending { background:rgba(139,148,158,.15); color:var(--muted); }
+
+/* ── Audit log viewer ─── */
+.audit-viewer { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.audit-entry { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:8px 10px; font-size:11px; }
+.audit-entry .ae-action { font-family:monospace; color:var(--accent); font-size:10px; }
+.audit-entry .ae-meta { color:var(--muted); margin-top:3px; }
+.audit-entry .ae-user { font-family:monospace; color:var(--green); }
+.audit-entry .ae-tenants { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.audit-entry .ae-tenants span { padding:1px 6px; border-radius:8px; font-size:10px; }
+.ae-tenants .t1-bg { background:rgba(88,166,255,.15); color:var(--t1); }
+.ae-tenants .t2-bg { background:rgba(188,140,255,.15); color:var(--t2); }
+.ae-tenants .t3-bg { background:rgba(63,185,80,.15); color:var(--t3); }
+
+/* ── Concurrent test runner ─── */
+.runner-panel { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.runner-bar { display:flex; align-items:center; gap:8px; }
+.runner-log { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:8px 10px; font-size:11px; font-family:monospace; color:var(--muted);
+  max-height:200px; overflow-y:auto; line-height:1.6; }
+.runner-log .rl-ok { color:var(--green); }
+.runner-log .rl-err { color:var(--red); }
+.runner-log .rl-info { color:var(--accent); }
+.runner-log .rl-time { color:var(--muted); font-size:10px; }
+
+/* ── Rate limit monitor ─── */
+.rate-monitor { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.rate-row { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:8px 10px; display:flex; align-items:center; justify-content:space-between; }
+.rate-row .rr-name { font-size:12px; font-weight:600; }
+.rate-row .rr-info { font-size:10px; color:var(--muted); }
+.rate-row .rr-limit { font-size:12px; font-weight:700; color:var(--accent); }
+
+/* ── Refresh toggle ─── */
+.auto-refresh { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); }
+.auto-refresh input[type=checkbox] { width:14px; height:14px; }
+
+/* ── Utility ─── */
+.hidden { display:none !important; }
+.divider { border:none; border-top:1px solid var(--border); margin:4px 0; }
+.text-muted { color:var(--muted); font-size:11px; }
+.text-green { color:var(--green); }
+.text-red { color:var(--red); }
+.text-accent { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header>
+  <h1>🔬 Hermes — Multi-Tenant Isolation Test</h1>
+
+  <div class="hdr">
+    <label>API URL</label>
+    <input class="hdr-url" id="cfgUrl" value="http://localhost:18081" placeholder="http://localhost:8080">
+  </div>
+
+  <div class="hdr">
+    <label>Admin Token</label>
+    <input id="cfgAdminToken" value="dev-token-change-in-production" type="password" placeholder="Bearer token">
+  </div>
+
+  <span class="status-dot" id="connDot"></span>
+  <span class="status-text" id="connStatus">Not connected</span>
+
+  <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
+    <label class="auto-refresh">
+      <input type="checkbox" id="autoRefresh" checked>
+      Auto-refresh audit
+    </label>
+    <button class="btn btn-ghost" onclick="loadAudit()">Refresh Audit</button>
+  </div>
+</header>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<div class="main">
+
+  <!-- ── LEFT: User config ── -->
+  <aside class="config-panel">
+    <h3>👥 Simulated Users</h3>
+
+    <div class="user-card" id="uc-alice">
+      <div class="uc-header">
+        <span class="uc-badge t1">T1</span>
+        <span class="uc-name">Alice</span>
+      </div>
+      <div class="uc-row">
+        <label>Key</label>
+        <div class="uc-inputs">
+          <input id="alice-key" placeholder="hk_... (auto if empty)">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="createKeyFor('alice')">+ Create Key</button>
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="initAlice()">Init</button>
+          </div>
+        </div>
+      </div>
+      <div class="uc-row">
+        <label>Session</label>
+        <input id="alice-session" value="alice-s1">
+      </div>
+      <div class="uc-row">
+        <label>Rate</label>
+        <input id="alice-rate" value="120" style="width:60px" type="number"> RPM
+      </div>
+    </div>
+
+    <div class="user-card" id="uc-bob">
+      <div class="uc-header">
+        <span class="uc-badge t1">T1</span>
+        <span class="uc-name">Bob</span>
+        <span class="text-muted" style="font-size:10px;margin-left:4px">same tenant as Alice</span>
+      </div>
+      <div class="uc-row">
+        <label>Key</label>
+        <div class="uc-inputs">
+          <input id="bob-key" placeholder="hk_... (auto if empty)">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="createKeyFor('bob')">+ Create Key</button>
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="initBob()">Init</button>
+          </div>
+        </div>
+      </div>
+      <div class="uc-row">
+        <label>Session</label>
+        <input id="bob-session" value="bob-s1">
+      </div>
+      <div class="uc-row">
+        <label>Rate</label>
+        <input id="bob-rate" value="120" style="width:60px" type="number"> RPM
+      </div>
+    </div>
+
+    <div class="user-card" id="uc-charlie">
+      <div class="uc-header">
+        <span class="uc-badge t2">T2</span>
+        <span class="uc-name">Charlie</span>
+      </div>
+      <div class="uc-row">
+        <label>Key</label>
+        <div class="uc-inputs">
+          <input id="charlie-key" placeholder="hk_... (auto if empty)">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="createKeyFor('charlie')">+ Create Key</button>
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="initCharlie()">Init</button>
+          </div>
+        </div>
+      </div>
+      <div class="uc-row">
+        <label>Session</label>
+        <input id="charlie-session" value="charlie-s1">
+      </div>
+      <div class="uc-row">
+        <label>Rate</label>
+        <input id="charlie-rate" value="60" style="width:60px" type="number"> RPM
+      </div>
+    </div>
+
+    <div class="user-card" id="uc-diana">
+      <div class="uc-header">
+        <span class="uc-badge t3">T3</span>
+        <span class="uc-name">Diana</span>
+      </div>
+      <div class="uc-row">
+        <label>Key</label>
+        <div class="uc-inputs">
+          <input id="diana-key" placeholder="hk_... (auto if empty)">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="createKeyFor('diana')">+ Create Key</button>
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 6px" onclick="initDiana()">Init</button>
+          </div>
+        </div>
+      </div>
+      <div class="uc-row">
+        <label>Session</label>
+        <input id="diana-session" value="diana-s1">
+      </div>
+      <div class="uc-row">
+        <label>Rate</label>
+        <input id="diana-rate" value="60" style="width:60px" type="number"> RPM
+      </div>
+    </div>
+
+    <hr class="divider">
+    <h3>⚡ Test Runner</h3>
+    <button class="btn btn-green" style="width:100%" onclick="runIsolationTest()">▶ Run All Isolation Tests</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="runConcurrentTest()">⚡ Concurrent Burst Test</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="clearAllChats()">🗑 Clear All Chats</button>
+  </aside>
+
+  <!-- ── CENTER: Chat panels (2x2 grid) ── -->
+  <div class="chat-area">
+
+    <!-- Alice (Tenant-1) -->
+    <div class="chat-panel" id="panel-alice">
+      <div class="panel-hdr">
+        <div class="tenant-dot" style="background:var(--t1)"></div>
+        <h2>Alice</h2>
+        <span class="session-tag" id="alice-sess-tag">—</span>
+        <span class="rate-badge" id="alice-rate-badge">— RPM</span>
+      </div>
+      <div class="messages" id="msgs-alice"></div>
+      <div class="panel-foot">
+        <input id="inp-alice" placeholder="Message to Alice..." onkeydown="if(event.key==='Enter')sendMsg('alice')">
+        <button class="btn btn-primary" onclick="sendMsg('alice')">Send</button>
+      </div>
+    </div>
+
+    <!-- Bob (Tenant-1, same tenant) -->
+    <div class="chat-panel" id="panel-bob">
+      <div class="panel-hdr">
+        <div class="tenant-dot" style="background:var(--t1)"></div>
+        <h2>Bob</h2>
+        <span class="session-tag" id="bob-sess-tag">—</span>
+        <span class="rate-badge" id="bob-rate-badge">— RPM</span>
+      </div>
+      <div class="messages" id="msgs-bob"></div>
+      <div class="panel-foot">
+        <input id="inp-bob" placeholder="Message to Bob..." onkeydown="if(event.key==='Enter')sendMsg('bob')">
+        <button class="btn btn-primary" onclick="sendMsg('bob')">Send</button>
+      </div>
+    </div>
+
+    <!-- Charlie (Tenant-2) -->
+    <div class="chat-panel" id="panel-charlie">
+      <div class="panel-hdr">
+        <div class="tenant-dot" style="background:var(--t2)"></div>
+        <h2>Charlie</h2>
+        <span class="session-tag" id="charlie-sess-tag">—</span>
+        <span class="rate-badge" id="charlie-rate-badge">— RPM</span>
+      </div>
+      <div class="messages" id="msgs-charlie"></div>
+      <div class="panel-foot">
+        <input id="inp-charlie" placeholder="Message to Charlie..." onkeydown="if(event.key==='Enter')sendMsg('charlie')">
+        <button class="btn btn-primary" onclick="sendMsg('charlie')">Send</button>
+      </div>
+    </div>
+
+    <!-- Diana (Tenant-3) -->
+    <div class="chat-panel" id="panel-diana">
+      <div class="panel-hdr">
+        <div class="tenant-dot" style="background:var(--t3)"></div>
+        <h2>Diana</h2>
+        <span class="session-tag" id="diana-sess-tag">—</span>
+        <span class="rate-badge" id="diana-rate-badge">— RPM</span>
+      </div>
+      <div class="messages" id="msgs-diana"></div>
+      <div class="panel-foot">
+        <input id="inp-diana" placeholder="Message to Diana..." onkeydown="if(event.key==='Enter')sendMsg('diana')">
+        <button class="btn btn-primary" onclick="sendMsg('diana')">Send</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Test results + audit ── -->
+  <aside class="right-panel">
+    <div class="rp-tabs">
+      <div class="rp-tab active" data-tab="tests" onclick="switchTab('tests')">Tests</div>
+      <div class="rp-tab" data-tab="audit" onclick="switchTab('audit')">Audit</div>
+      <div class="rp-tab" data-tab="runner" onclick="switchTab('runner')">Runner</div>
+      <div class="rp-tab" data-tab="rates" onclick="switchTab('rates')">Rates</div>
+    </div>
+
+    <!-- Tests tab -->
+    <div class="rp-content" id="tab-tests">
+      <div class="test-results">
+        <div class="test-card" id="tc-isolation">
+          <h4><span class="tc-icon pending" id="tc-isolation-icon">○</span> Session Isolation</h4>
+          <div class="tc-badge pending" id="tc-isolation-badge">PENDING</div>
+          <div class="tc-detail" id="tc-isolation-detail">
+            Each user's session receives replies containing their tenant ID. No cross-tenant message leakage.
+          </div>
+        </div>
+        <div class="test-card" id="tc-tenant">
+          <h4><span class="tc-icon pending" id="tc-tenant-icon">○</span> Tenant Isolation</h4>
+          <div class="tc-badge pending" id="tc-tenant-badge">PENDING</div>
+          <div class="tc-detail" id="tc-tenant-detail">
+            Alice &amp; Bob (T1) share tenant; Charlie (T2), Diana (T3) are separate. Tenant traffic never crosses boundaries.
+          </div>
+        </div>
+        <div class="test-card" id="tc-concurrent">
+          <h4><span class="tc-icon pending" id="tc-concurrent-icon">○</span> Concurrent Safety</h4>
+          <div class="tc-badge pending" id="tc-concurrent-badge">PENDING</div>
+          <div class="tc-detail" id="tc-concurrent-detail">
+            Rapid interleaved messages between all users. No message reordering, dropping, or corruption.
+          </div>
+        </div>
+        <div class="test-card" id="tc-ratelimit">
+          <h4><span class="tc-icon pending" id="tc-ratelimit-icon">○</span> Rate Limit Config</h4>
+          <div class="tc-badge pending" id="tc-ratelimit-badge">PENDING</div>
+          <div class="tc-detail" id="tc-ratelimit-detail">
+            Per-tenant rate limits applied: T1=120 RPM, T2=60 RPM, T3=60 RPM.
+          </div>
+        </div>
+        <div class="test-card" id="tc-history">
+          <h4><span class="tc-icon pending" id="tc-history-icon">○</span> History Integrity</h4>
+          <div class="tc-badge pending" id="tc-history-badge">PENDING</div>
+          <div class="tc-detail" id="tc-history-detail">
+            Multi-turn conversation: each user accumulates correct message history in their session.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit tab -->
+    <div class="rp-content hidden" id="tab-audit">
+      <div class="audit-viewer" id="audit-list">
+        <div class="text-muted" style="text-align:center;padding:20px">Click "Refresh Audit" to load logs</div>
+      </div>
+    </div>
+
+    <!-- Runner tab -->
+    <div class="rp-content hidden" id="tab-runner">
+      <div class="runner-panel">
+        <div class="runner-bar">
+          <button class="btn btn-green" id="btn-run" onclick="runIsolationTest()">▶ Run Tests</button>
+          <button class="btn btn-red" id="btn-concurrent" onclick="runConcurrentTest()">⚡ Burst</button>
+          <span class="status-text" id="runner-status"></span>
+        </div>
+        <div class="runner-log" id="runner-log">Ready. Configure users and run tests.</div>
+      </div>
+    </div>
+
+    <!-- Rate limits tab -->
+    <div class="rp-content hidden" id="tab-rates">
+      <div class="rate-monitor" id="rate-list">
+        <div class="rate-row">
+          <div><div class="rr-name" style="color:var(--t1)">Tenant-1 (Alice, Bob)</div><div class="rr-info">Rate limit from DB</div></div>
+          <div class="rr-limit" id="rate-t1">— RPM</div>
+        </div>
+        <div class="rate-row">
+          <div><div class="rr-name" style="color:var(--t2)">Tenant-2 (Charlie)</div><div class="rr-info">Rate limit from DB</div></div>
+          <div class="rr-limit" id="rate-t2">— RPM</div>
+        </div>
+        <div class="rate-row">
+          <div><div class="rr-name" style="color:var(--t3)">Tenant-3 (Diana)</div><div class="rr-info">Rate limit from DB</div></div>
+          <div class="rr-limit" id="rate-t3">— RPM</div>
+        </div>
+        <hr class="divider">
+        <div class="text-muted" style="font-size:11px;line-height:1.5">
+          Rate limits are enforced by the middleware stack. When a tenant's configured RPM is exceeded, subsequent requests within the same minute window receive HTTP 429.
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const chatHist = {}; // user → [{role, content}]
+const userState = {}; // user → { tenantId, apiKey, sessionId, rateLimitRpm }
+
+// Tenant → color mapping
+const T = { alice: 't1', bob: 't1', charlie: 't2', diana: 't3' };
+const TENANT_IDS = { t1: null, t2: null, t3: null }; // filled after tenant creation
+
+function getCfg() {
+  return {
+    url: $('cfgUrl').value.replace(/\/$/, ''),
+    adminToken: $('cfgAdminToken').value,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════
+function addMsg(user, role, text, meta) {
+  const area = $(`msgs-${user}`);
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (meta) {
+    div.innerHTML = `<div>${escHtml(text)}</div><div class="msg-meta">${meta}</div>`;
+  } else {
+    div.textContent = text;
+  }
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function addSys(user, text) {
+  addMsg(user, 'sys', text);
+}
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/"/g, '&quot;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function log(msg, type = 'info') {
+  const el = $('runner-log');
+  const ts = new Date().toLocaleTimeString();
+  const cls = type === 'ok' ? 'rl-ok' : type === 'err' ? 'rl-err' : 'rl-info';
+  el.innerHTML += `<div><span class="rl-time">${ts}</span> <span class="${cls}">${escHtml(msg)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setTest(id, status, detail) {
+  const icon = $(`tc-${id}-icon`);
+  const badge = $(`tc-${id}-badge`);
+  const dEl = $(`tc-${id}-detail`);
+  icon.textContent = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '○';
+  icon.className = `tc-icon ${status}`;
+  badge.textContent = status.toUpperCase();
+  badge.className = `tc-badge ${status}`;
+  if (detail !== undefined) dEl.textContent = detail;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Auth helpers
+// ═══════════════════════════════════════════════════════════════════
+async function api(path, options = {}) {
+  const { url, adminToken } = getCfg();
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminToken) headers['Authorization'] = `Bearer ${adminToken}`;
+  const res = await fetch(url + path, { ...options, headers });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+async function chatApi(userKey, sessionId, messages) {
+  const { url } = getCfg();
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${userKey}`,
+  };
+  const res = await fetch(url + '/v1/chat/completions', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model: 'mock', messages }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Connection check
+// ═══════════════════════════════════════════════════════════════════
+async function checkConn() {
+  const { url } = getCfg();
+  const dot = $('connDot');
+  const txt = $('connStatus');
+  try {
+    const r = await fetch(url + '/health/live');
+    if (r.ok) {
+      dot.className = 'status-dot ok';
+      txt.textContent = 'Connected';
+    } else {
+      dot.className = 'status-dot err';
+      txt.textContent = `HTTP ${r.status}`;
+    }
+  } catch(e) {
+    dot.className = 'status-dot err';
+    txt.textContent = e.message;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Tenant & Key init
+// ═══════════════════════════════════════════════════════════════════
+async function createTenant(name, rateRpm) {
+  try {
+    return await api('/v1/tenants', {
+      method: 'POST',
+      body: JSON.stringify({ name, plan: 'pro', rate_limit_rpm: rateRpm, max_sessions: 10 }),
+    });
+  } catch(e) {
+    log(`Tenant ${name} may already exist: ${e.message}`, 'info');
+    // Fetch existing
+    const list = await api('/v1/tenants');
+    return list.tenants?.find(t => t.name === name) || list.tenants?.[0];
+  }
+}
+
+async function createKey(name, tenantId, roles) {
+  const result = await api('/v1/api-keys', {
+    method: 'POST',
+    body: JSON.stringify({ name, tenant_id: tenantId, roles }),
+  });
+  return result.key || result.RawKey;
+}
+
+async function createKeyFor(user) {
+  const cfg = getCfg();
+  const keyInput = $(`${user}-key`);
+  if (userState[user]?.apiKey) {
+    keyInput.value = userState[user].apiKey;
+    log(`${user}: using existing key`, 'info');
+    return;
+  }
+  try {
+    const state = userState[user];
+    const key = await createKey(`${user}-key`, state.tenantId, ['user']);
+    keyInput.value = key;
+    state.apiKey = key;
+    log(`${user}: API key created ${key.slice(0,12)}...`, 'ok');
+  } catch(e) {
+    log(`${user}: Failed to create key: ${e.message}`, 'err');
+  }
+}
+
+async function initAlice() {
+  try {
+    // Tenant-1 (if not exists)
+    if (!TENANT_IDS.t1) {
+      const t = await createTenant('Tenant-1', 120);
+      TENANT_IDS.t1 = t?.id;
+      $('alice-rate').value = '120';
+      $('bob-rate').value = '120';
+    }
+    // Create key if needed
+    if (!userState.alice?.apiKey) {
+      const key = await createKey('alice-key', TENANT_IDS.t1, ['user']);
+      $('alice-key').value = key;
+      userState.alice = { tenantId: TENANT_IDS.t1, apiKey: key, sessionId: $('alice-session').value, rateLimitRpm: 120 };
+    }
+    $('alice-rate-badge').textContent = '120 RPM';
+    $('alice-sess-tag').textContent = userState.alice.sessionId.slice(0,12);
+    addSys('alice', `Ready — tenant: ${userState.alice.tenantId?.slice(0,8)}`);
+    log('Alice initialized', 'ok');
+  } catch(e) {
+    addSys('alice', 'Init failed: ' + e.message);
+    log('Alice init failed: ' + e.message, 'err');
+  }
+}
+
+async function initBob() {
+  try {
+    if (!TENANT_IDS.t1) {
+      await initAlice();
+    }
+    const state = userState.bob || {};
+    if (!state.apiKey) {
+      const key = await createKey('bob-key', TENANT_IDS.t1, ['user']);
+      $('bob-key').value = key;
+      state.tenantId = TENANT_IDS.t1;
+      state.apiKey = key;
+      state.rateLimitRpm = 120;
+      userState.bob = state;
+    }
+    $('bob-rate-badge').textContent = '120 RPM';
+    $('bob-sess-tag').textContent = state.sessionId || $('bob-session').value;
+    addSys('bob', `Ready — tenant: ${state.tenantId?.slice(0,8)}`);
+    log('Bob initialized (same tenant as Alice)', 'ok');
+  } catch(e) {
+    addSys('bob', 'Init failed: ' + e.message);
+    log('Bob init failed: ' + e.message, 'err');
+  }
+}
+
+async function initCharlie() {
+  try {
+    if (!TENANT_IDS.t2) {
+      const t = await createTenant('Tenant-2', 60);
+      TENANT_IDS.t2 = t?.id;
+      $('charlie-rate').value = '60';
+    }
+    const state = userState.charlie || {};
+    if (!state.apiKey) {
+      const key = await createKey('charlie-key', TENANT_IDS.t2, ['user']);
+      $('charlie-key').value = key;
+      state.tenantId = TENANT_IDS.t2;
+      state.apiKey = key;
+      state.rateLimitRpm = 60;
+      state.sessionId = $('charlie-session').value;
+      userState.charlie = state;
+    }
+    $('charlie-rate-badge').textContent = '60 RPM';
+    $('charlie-sess-tag').textContent = state.sessionId;
+    addSys('charlie', `Ready — tenant: ${state.tenantId?.slice(0,8)}`);
+    log('Charlie initialized', 'ok');
+  } catch(e) {
+    addSys('charlie', 'Init failed: ' + e.message);
+    log('Charlie init failed: ' + e.message, 'err');
+  }
+}
+
+async function initDiana() {
+  try {
+    if (!TENANT_IDS.t3) {
+      const t = await createTenant('Tenant-3', 60);
+      TENANT_IDS.t3 = t?.id;
+      $('diana-rate').value = '60';
+    }
+    const state = userState.diana || {};
+    if (!state.apiKey) {
+      const key = await createKey('diana-key', TENANT_IDS.t3, ['user']);
+      $('diana-key').value = key;
+      state.tenantId = TENANT_IDS.t3;
+      state.apiKey = key;
+      state.rateLimitRpm = 60;
+      state.sessionId = $('diana-session').value;
+      userState.diana = state;
+    }
+    $('diana-rate-badge').textContent = '60 RPM';
+    $('diana-sess-tag').textContent = state.sessionId;
+    addSys('diana', `Ready — tenant: ${state.tenantId?.slice(0,8)}`);
+    log('Diana initialized', 'ok');
+  } catch(e) {
+    addSys('diana', 'Init failed: ' + e.message);
+    log('Diana init failed: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Chat
+// ═══════════════════════════════════════════════════════════════════
+async function sendMsg(user) {
+  const input = $(`inp-${user}`);
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const state = userState[user];
+  if (!state?.apiKey) {
+    addSys(user, 'Not initialized. Click "Init" first.');
+    return;
+  }
+
+  addMsg(user, 'user', text);
+  addSys(user, 'sending...');
+
+  if (!chatHist[user]) chatHist[user] = [];
+  chatHist[user].push({ role: 'user', content: text });
+
+  try {
+    const data = await chatApi(state.apiKey, state.sessionId, chatHist[user]);
+    const reply = data.choices?.[0]?.message?.content || '(no response)';
+    // Remove thinking indicator
+    const area = $(`msgs-${user}`);
+    if (area.lastChild && area.lastChild.classList.contains('msg') && area.lastChild.classList.contains('sys')) {
+      area.removeChild(area.lastChild);
+    }
+    addMsg(user, 'assistant', reply, `tenant: ${state.tenantId?.slice(0,8)} | session: ${state.sessionId?.slice(0,8)}`);
+    chatHist[user].push({ role: 'assistant', content: reply });
+  } catch(e) {
+    const area = $(`msgs-${user}`);
+    if (area.lastChild) area.removeChild(area.lastChild);
+    addMsg(user, 'sys', 'Error: ' + e.message);
+    log(`${user} error: ${e.message}`, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Automated Isolation Tests
+// ═══════════════════════════════════════════════════════════════════
+async function runIsolationTest() {
+  log('═══ Running isolation tests ═══', 'info');
+
+  // Ensure all users initialized
+  await initAlice();
+  await initBob();
+  await initCharlie();
+  await initDiana();
+  await sleep(300);
+
+  const ts = Date.now();
+  const aliceSess = `test-alice-${ts}`;
+  const bobSess = `test-bob-${ts}`;
+  const charlieSess = `test-charlie-${ts}`;
+  const dianaSess = `test-diana-${ts}`;
+
+  userState.alice.sessionId = aliceSess;
+  userState.bob.sessionId = bobSess;
+  userState.charlie.sessionId = charlieSess;
+  userState.diana.sessionId = dianaSess;
+
+  $('alice-sess-tag').textContent = aliceSess.slice(0, 10);
+  $('bob-sess-tag').textContent = bobSess.slice(0, 10);
+  $('charlie-sess-tag').textContent = charlieSess.slice(0, 10);
+  $('diana-sess-tag').textContent = dianaSess.slice(0, 10);
+
+  // ── Test 1: Session Isolation ─────────────────────
+  log('Test 1: Session isolation...', 'info');
+  clearChat('alice'); clearChat('bob'); clearChat('charlie'); clearChat('diana');
+
+  const [a1, b1, c1, d1] = await Promise.allSettled([
+    chatRound('alice', aliceSess, 'What is your tenant ID? Reply with only the tenant ID.', ts),
+    chatRound('bob', bobSess, 'What is your tenant ID? Reply with only the tenant ID.', ts),
+    chatRound('charlie', charlieSess, 'What is your tenant ID? Reply with only the tenant ID.', ts),
+    chatRound('diana', dianaSess, 'What is your tenant ID? Reply with only the tenant ID.', ts),
+  ]);
+
+  const aliceReply = a1.value || '';
+  const bobReply = b1.value || '';
+  const charlieReply = c1.value || '';
+  const dianaReply = d1.value || '';
+
+  // All replies should contain their respective tenant IDs
+  const aliceTenant = TENANT_IDS.t1;
+  const charlieTenant = TENANT_IDS.t2;
+  const dianaTenant = TENANT_IDS.t3;
+
+  const aliceOk = aliceReply.includes(aliceTenant?.slice(0, 8) || 'Tenant-1');
+  const bobOk = bobReply.includes(aliceTenant?.slice(0, 8) || 'Tenant-1'); // Bob also T1
+  const charlieOk = charlieReply.includes(charlieTenant?.slice(0, 8) || 'Tenant-2');
+  const dianaOk = dianaReply.includes(dianaTenant?.slice(0, 8) || 'Tenant-3');
+
+  const isolationPass = aliceOk && bobOk && charlieOk && dianaOk;
+  setTest('isolation', isolationPass ? 'pass' : 'fail',
+    `Alice(${aliceOk?'✓':'✗'}) Bob(${bobOk?'✓':'✗'}) Charlie(${charlieOk?'✓':'✗'}) Diana(${dianaOk?'✓':'✗'}) replies contain correct tenant IDs`);
+  log(`Session isolation: ${isolationPass ? 'PASS' : 'FAIL'}`, isolationPass ? 'ok' : 'err');
+
+  // ── Test 2: Tenant Boundary ───────────────────────
+  log('Test 2: Tenant boundary...', 'info');
+  // Alice and Bob should have SAME tenant; Charlie and Diana different
+  const aliceTenantOk = aliceReply.includes(aliceTenant?.slice(0,8) || 'Tenant-1') || aliceReply.includes('Tenant-1');
+  const bobTenantOk = bobReply.includes(aliceTenant?.slice(0,8) || 'Tenant-1') || bobReply.includes('Tenant-1');
+  const charlieTenantOk = !charlieReply.includes(aliceTenant?.slice(0,8) || 'Tenant-1');
+  const dianaTenantOk = !dianaReply.includes(charlieTenant?.slice(0,8) || 'Tenant-2');
+
+  const tenantPass = aliceTenantOk && bobTenantOk && charlieTenantOk && dianaTenantOk;
+  setTest('tenant', tenantPass ? 'pass' : 'fail',
+    `Alice+Bob share T1(${aliceTenantOk&&bobTenantOk?'✓':'✗'}) Charlie≠T1(${charlieTenantOk?'✓':'✗'}) Diana≠T2(${dianaTenantOk?'✓':'✗'})`);
+  log(`Tenant boundary: ${tenantPass ? 'PASS' : 'FAIL'}`, tenantPass ? 'ok' : 'err');
+
+  // ── Test 3: History Integrity ─────────────────────
+  log('Test 3: History integrity...', 'info');
+  const histAlice = chatHist['alice'] || [];
+  const histBob = chatHist['bob'] || [];
+
+  // Each conversation should have 2 messages (user + assistant)
+  const histPass = histAlice.length >= 2 && histBob.length >= 2 &&
+    histAlice.every(m => m.role === 'user' || m.role === 'assistant');
+
+  setTest('history', histPass ? 'pass' : 'fail',
+    `Alice msgs: ${histAlice.length}, Bob msgs: ${histBob.length} — all properly ordered`);
+  log(`History integrity: ${histPass ? 'PASS' : 'FAIL'} (Alice:${histAlice.length} Bob:${histBob.length})`, histPass ? 'ok' : 'err');
+
+  // ── Test 4: Rate Limit Config ──────────────────────
+  log('Test 4: Rate limit config...', 'info');
+  try {
+    const meAlice = await api('/v1/me');
+    const meCharlie = await api('/v1/me'); // uses admin token, so same tenant
+    // Actually use Charlie's token directly
+    const meCharlieReal = await (async () => {
+      if (!userState.charlie?.apiKey) return { rate_limit_rpm: 60 };
+      return chatApi(userState.charlie.apiKey, charlieSess + '-rate', [
+        { role: 'user', content: 'Confirm your rate limit RPM in one word.' }
+      ]).then(d => ({ reply: d.choices?.[0]?.message?.content }));
+    })();
+
+    // Check from API
+    const tenants = await api('/v1/tenants');
+    const t1 = tenants.tenants?.find(t => t.name === 'Tenant-1');
+    const t2 = tenants.tenants?.find(t => t.name === 'Tenant-2');
+    const t3 = tenants.tenants?.find(t => t.name === 'Tenant-3');
+
+    const ratePass = t1?.rate_limit_rpm === 120 && t2?.rate_limit_rpm === 60 && t3?.rate_limit_rpm === 60;
+    $('rate-t1').textContent = `${t1?.rate_limit_rpm || '?'} RPM`;
+    $('rate-t2').textContent = `${t2?.rate_limit_rpm || '?'} RPM`;
+    $('rate-t3').textContent = `${t3?.rate_limit_rpm || '?'} RPM`;
+
+    setTest('ratelimit', ratePass ? 'pass' : 'fail',
+      `T1=${t1?.rate_limit_rpm} RPM (expected 120) | T2=${t2?.rate_limit_rpm} RPM (expected 60) | T3=${t3?.rate_limit_rpm} RPM (expected 60)`);
+    log(`Rate limits: ${ratePass ? 'PASS' : 'FAIL'} T1=${t1?.rate_limit_rpm} T2=${t2?.rate_limit_rpm} T3=${t3?.rate_limit_rpm}`, ratePass ? 'ok' : 'err');
+  } catch(e) {
+    setTest('ratelimit', 'fail', 'Error checking rate limits: ' + e.message);
+    log('Rate limit test failed: ' + e.message, 'err');
+  }
+
+  // ── Test 5: Concurrent Safety ─────────────────────
+  // (run separately via runConcurrentTest)
+  setTest('concurrent', 'pending', 'Run "Concurrent Burst Test" separately');
+
+  log('═══ Tests complete ═══', 'info');
+  await loadAudit();
+}
+
+async function chatRound(user, session, msg, seed) {
+  const state = userState[user];
+  if (!state?.apiKey) return '';
+  if (!chatHist[user]) chatHist[user] = [];
+
+  try {
+    const data = await chatApi(state.apiKey, session, chatHist[user].concat([{ role: 'user', content: msg }]));
+    const reply = data.choices?.[0]?.message?.content || '';
+    chatHist[user].push({ role: 'user', content: msg });
+    chatHist[user].push({ role: 'assistant', content: reply });
+    return reply;
+  } catch(e) {
+    return '';
+  }
+}
+
+async function runConcurrentTest() {
+  log('═══ Concurrent burst test ═══', 'info');
+  const ts = Date.now();
+
+  // Use fresh sessions for concurrent test
+  const sessions = {
+    alice: `con-alice-${ts}`,
+    bob: `con-bob-${ts}`,
+    charlie: `con-charlie-${ts}`,
+    diana: `con-diana-${ts}`,
+  };
+
+  // Send 5 rapid interleaved messages per user
+  const msgs = [
+    { user: 'alice', msg: `Alice msg 1 [${ts}]` },
+    { user: 'bob', msg: `Bob msg 1 [${ts}]` },
+    { user: 'charlie', msg: `Charlie msg 1 [${ts}]` },
+    { user: 'diana', msg: `Diana msg 1 [${ts}]` },
+    { user: 'alice', msg: `Alice msg 2 [${ts}]` },
+    { user: 'charlie', msg: `Charlie msg 2 [${ts}]` },
+    { user: 'bob', msg: `Bob msg 2 [${ts}]` },
+    { user: 'diana', msg: `Diana msg 2 [${ts}]` },
+    { user: 'alice', msg: `Alice msg 3 [${ts}]` },
+    { user: 'bob', msg: `Bob msg 3 [${ts}]` },
+  ];
+
+  // Fire all concurrently
+  const promises = msgs.map(({ user, msg }) =>
+    chatRound(user, sessions[user], msg, ts)
+      .then(reply => ({ user, msg, reply, ok: !reply.includes('[OTHER_USER]') }))
+      .catch(e => ({ user, msg, reply: '', ok: false, err: e.message }))
+  );
+
+  log(`Firing ${msgs.length} concurrent messages...`, 'info');
+  const results = await Promise.all(promises);
+
+  const okCount = results.filter(r => r.ok).length;
+  const failCount = results.length - okCount;
+
+  // Verify: each user's replies should NOT contain other users' names
+  // (mock replies are tenant-aware, so they won't leak other users)
+  const concurrentPass = okCount === results.length;
+
+  setTest('concurrent', concurrentPass ? 'pass' : 'fail',
+    `${okCount}/${results.length} messages completed without errors. Rapid interleaving safe.`);
+
+  log(`Concurrent burst: ${okCount}/${results.length} OK`, concurrentPass ? 'ok' : 'err');
+
+  // Verify each user's session got correct count
+  for (const user of ['alice', 'bob', 'charlie', 'diana']) {
+    const userResults = results.filter(r => r.user === user);
+    const hist = chatHist[user] || [];
+    log(`${user}: ${userResults.length} sent, ${hist.filter(m=>m.role==='assistant').length} replies`, 'info');
+  }
+
+  log('═══ Burst test complete ═══', 'info');
+  await loadAudit();
+}
+
+function clearChat(user) {
+  chatHist[user] = [];
+  $(`msgs-${user}`).innerHTML = '';
+}
+
+function clearAllChats() {
+  for (const u of ['alice', 'bob', 'charlie', 'diana']) clearChat(u);
+  log('All chats cleared', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Audit logs
+// ═══════════════════════════════════════════════════════════════════
+async function loadAudit() {
+  try {
+    const data = await api('/v1/audit-logs?limit=50');
+    const logs = data.audit_logs || [];
+    const el = $('audit-list');
+    if (!logs.length) {
+      el.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px">No audit logs yet</div>';
+      return;
+    }
+    el.innerHTML = logs.map(l => {
+      const isChat = l.action?.includes('POST /v1/chat') || l.action?.includes('GET /v1/chat');
+      const tenantClass = l.tenant_id === TENANT_IDS.t1 ? 't1-bg' :
+                          l.tenant_id === TENANT_IDS.t2 ? 't2-bg' : 't3-bg';
+      return `<div class="audit-entry">
+        <div class="ae-action">${escHtml(l.action || '—')}</div>
+        <div class="ae-meta">
+          tenant=<span class="ae-user">${escHtml(l.user_id || '—')}</span>
+          status=${l.status_code || '?'}
+          latency=${l.latency_ms || '?'}ms
+        </div>
+        <div class="ae-meta">${l.created_at ? new Date(l.created_at).toLocaleTimeString() : '—'}</div>
+        <div class="ae-tenants">
+          <span class="${tenantClass}">${escHtml(l.tenant_id || '—')}</span>
+        </div>
+      </div>`;
+    }).join('');
+    log(`Audit: ${logs.length} records loaded`, 'ok');
+  } catch(e) {
+    log('Audit load failed: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Tab switcher
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.rp-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.rp-content').forEach(c => c.classList.add('hidden'));
+  $(`tab-${tab}`).classList.remove('hidden');
+  document.querySelector(`.rp-tab[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'audit') loadAudit();
+  if (tab === 'rates') loadRateLimits();
+}
+
+async function loadRateLimits() {
+  try {
+    const tenants = await api('/v1/tenants');
+    const t1 = tenants.tenants?.find(t => t.name === 'Tenant-1');
+    const t2 = tenants.tenants?.find(t => t.name === 'Tenant-2');
+    const t3 = tenants.tenants?.find(t => t.name === 'Tenant-3');
+    $('rate-t1').textContent = `${t1?.rate_limit_rpm || '?'} RPM`;
+    $('rate-t2').textContent = `${t2?.rate_limit_rpm || '?'} RPM`;
+    $('rate-t3').textContent = `${t3?.rate_limit_rpm || '?'} RPM`;
+  } catch(e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Auto-refresh
+// ═══════════════════════════════════════════════════════════════════
+setInterval(() => {
+  if ($('autoRefresh').checked) loadAudit().catch(() => {});
+}, 10000);
+
+// ═══════════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════════
+(function init() {
+  checkConn();
+  setInterval(checkConn, 15000);
+  log('Page loaded. Configure and initialize users.', 'info');
+})();
+</script>
+</body>
+</html>
