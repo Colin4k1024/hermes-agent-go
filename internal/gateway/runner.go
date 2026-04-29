@@ -568,6 +568,15 @@ func (r *Runner) getOrCreateAgent(event *MessageEvent, session *SessionEntry) (*
 	if r.minioClient != nil {
 		loader := skills.NewMinIOSkillLoader(r.minioClient, tenantID)
 		opts = append(opts, agent.WithSkillLoader(loader))
+
+		// Per-tenant soul/persona from MinIO (capped at 64KB).
+		soulKey := tenantID + "/SOUL.md"
+		if soulData, err := r.minioClient.GetObject(context.Background(), soulKey); err == nil && len(soulData) > 0 && len(soulData) <= 64*1024 {
+			opts = append(opts, agent.WithSoulContent(string(soulData)))
+		}
+
+		// SaaS mode with MinIO: skip local filesystem context files.
+		opts = append(opts, agent.WithSkipContextFiles(true))
 	}
 
 	ag, err := agent.New(opts...)

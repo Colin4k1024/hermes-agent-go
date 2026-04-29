@@ -165,3 +165,8 @@ func WithUserID(id string) AgentOption {
 func WithMemoryProvider(mp tools.MemoryProvider) AgentOption {
 	return func(a *AIAgent) { a.memoryProvider = mp }
 }
+
+// WithSoulContent sets per-tenant soul/persona content injected into the system prompt.
+func WithSoulContent(content string) AgentOption {
+	return func(a *AIAgent) { a.soulContent = content }
+}

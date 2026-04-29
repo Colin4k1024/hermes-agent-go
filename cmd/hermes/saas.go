@@ -13,9 +13,11 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/acp"
 	"github.com/hermes-agent/hermes-agent-go/internal/api"
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
+	"github.com/hermes-agent/hermes-agent-go/internal/gateway"
 	"github.com/hermes-agent/hermes-agent-go/internal/gateway/platforms"
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
+	"github.com/hermes-agent/hermes-agent-go/internal/skills"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 	"github.com/hermes-agent/hermes-agent-go/internal/store/pg"
 	"github.com/jackc/pgx/v5"
@@ -150,7 +152,25 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// ── 7. Build API server config ───────────────────────────
+	// ── 7. Tenant provisioner (soul + skills) ────────────────
+	var tenantOpts []api.TenantHandlerOption
+	if skillsClient != nil {
+		prov := skills.NewProvisioner(skillsClient, "skills")
+		tenantOpts = append(tenantOpts, api.WithOnTenantCreated(func(ctx context.Context, tenantID string) {
+			if err := prov.Provision(ctx, tenantID); err != nil {
+				slog.Error("tenant provisioning failed", "tenant", tenantID, "error", err)
+			}
+		}))
+
+		// Background sync for existing tenants.
+		go func() {
+			if err := prov.SyncAllTenants(context.Background(), pgStore.Tenants()); err != nil {
+				slog.Error("startup tenant sync failed", "error", err)
+			}
+		}()
+	}
+
+	// ── 8. Build API server config ───────────────────────────
 	serverCfg := api.APIServerConfig{
 		Port:           port,
 		Store:          dataStore,
@@ -162,11 +182,12 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		AllowedOrigins: allowedOrigins,
 		StaticDir:      staticDir,
 		SkillsClient:   skillsClient,
+		TenantOpts:     tenantOpts,
 	}
 
 	saasServer := api.NewAPIServer(serverCfg)
 
-	// ── 8. Optionally start ACP server ────────────────────────
+	// ── 9. Optionally start ACP server ────────────────────────
 	var acpServer *acp.ACPServer
 	if acpPortStr := os.Getenv("HERMES_ACP_PORT"); acpPortStr != "" {
 		if acpPort, err := strconv.Atoi(acpPortStr); err == nil && acpPort > 0 {
@@ -174,21 +195,25 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// ── 9. OpenAI-compatible adapter ─────────────────────────
+	// ── 10. OpenAI-compatible adapter via gateway runner ───
 	if apiKey != "" {
 		adapterPortStr := os.Getenv("HERMES_API_PORT")
 		if adapterPortStr == "" {
 			adapterPortStr = "8081"
 		}
 		if adapterPort, err := strconv.Atoi(adapterPortStr); err == nil && adapterPort > 0 {
+			gwCfg := gateway.DefaultGatewayConfig()
+			runner := gateway.NewRunner(gwCfg, pgStore.Pool())
+
 			adapter := platforms.NewAPIServerAdapter(adapterPort, apiKey)
+			runner.RegisterAdapter(adapter)
+
 			go func() {
-				slog.Info("OpenAI API adapter starting", "port", adapterPort)
-				if err := adapter.Connect(context.Background()); err != nil {
-					slog.Warn("API adapter error", "error", err)
+				slog.Info("Gateway runner + API adapter starting", "port", adapterPort)
+				if err := runner.Start(); err != nil {
+					slog.Error("Gateway runner error", "error", err)
 				}
 			}()
-			_ = adapter
 		}
 	}
 

@@ -39,6 +39,8 @@ func (a *builtinMemoryAdapter) ReadUserProfile() (string, error) { return a.inne
 func (a *builtinMemoryAdapter) SaveUserProfile(c string) error   { return a.inner.SaveUserProfile(c) }
 
 // pgMemoryAdapter wraps agent.PGMemoryProvider to satisfy tools.MemoryProvider.
+var _ SystemPromptProvider = (*pgMemoryAdapter)(nil)
+
 type pgMemoryAdapter struct {
 	inner *PGMemoryProvider
 }
@@ -48,6 +50,7 @@ func (a *pgMemoryAdapter) SaveMemory(k, c string) error     { return a.inner.Sav
 func (a *pgMemoryAdapter) DeleteMemory(k string) error      { return a.inner.DeleteMemory(k) }
 func (a *pgMemoryAdapter) ReadUserProfile() (string, error) { return a.inner.ReadUserProfile() }
 func (a *pgMemoryAdapter) SaveUserProfile(c string) error   { return a.inner.SaveUserProfile(c) }
+func (a *pgMemoryAdapter) SystemPromptBlock() string        { return a.inner.SystemPromptBlock() }
 
 // honchoMemoryAdapter wraps agent.HonchoProvider to satisfy tools.MemoryProvider.
 type honchoMemoryAdapter struct {

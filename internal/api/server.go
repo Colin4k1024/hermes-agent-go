@@ -25,16 +25,17 @@ type APIServerConfig struct {
 	AuthChain      *auth.ExtractorChain
 	RBAC           middleware.RBACConfig
 	RateLimit      middleware.RateLimitConfig
-	Pool           *pgxpool.Pool            // direct pool access for memory operations
-	AllowedOrigins string                  // comma-separated list of allowed origins, or "*" for all
-	StaticDir      string                  // directory to serve static files from (optional)
-	SkillsClient   *objstore.MinIOClient  // optional; nil disables per-tenant skill loading
+	Pool           *pgxpool.Pool         // direct pool access for memory operations
+	AllowedOrigins string                // comma-separated list of allowed origins, or "*" for all
+	StaticDir      string                // directory to serve static files from (optional)
+	SkillsClient   *objstore.MinIOClient // optional; nil disables per-tenant skill loading
+	TenantOpts     []TenantHandlerOption // optional; wired into TenantHandler on creation
 }
 
 // APIServer is the multi-tenant SaaS API HTTP server.
 type APIServer struct {
-	cfg    APIServerConfig
-	server *http.Server
+	cfg      APIServerConfig
+	server   *http.Server
 	MockChat *mockChatHandler // accessible for testing/debugging
 }
 
@@ -104,8 +105,9 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 
 	// Authenticated routes — through middleware stack + audit.
 	api := http.NewServeMux()
-	api.Handle("/v1/tenants", NewTenantHandler(cfg.Store.Tenants()))
-	api.Handle("/v1/tenants/", NewTenantHandler(cfg.Store.Tenants()))
+	tenantHandler := NewTenantHandler(cfg.Store.Tenants(), cfg.TenantOpts...)
+	api.Handle("/v1/tenants", tenantHandler)
+	api.Handle("/v1/tenants/", tenantHandler)
 	api.Handle("/v1/api-keys", NewAPIKeyHandler(cfg.Store.APIKeys()))
 	api.Handle("/v1/api-keys/", NewAPIKeyHandler(cfg.Store.APIKeys()))
 	api.Handle("/v1/audit-logs", NewAuditHandler(cfg.Store.AuditLogs()))

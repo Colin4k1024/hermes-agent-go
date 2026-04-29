@@ -39,8 +39,8 @@ func (h *APIKeyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type createKeyRequest struct {
 	TenantID string   `json:"tenant_id"`
-	Name    string   `json:"name"`
-	Roles   []string `json:"roles,omitempty"`
+	Name     string   `json:"name"`
+	Roles    []string `json:"roles,omitempty"`
 }
 
 type createKeyResponse struct {

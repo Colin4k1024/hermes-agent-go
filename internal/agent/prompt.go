@@ -100,6 +100,22 @@ func (a *AIAgent) buildSystemPrompt() string {
 		}
 	}
 
+	// Soul content (per-tenant, loaded from MinIO in SaaS mode)
+	if a.soulContent != "" {
+		sb.WriteString("\n\n## Persona\n")
+		sb.WriteString(a.soulContent)
+	}
+
+	// Memory context (from PG memory provider via SystemPromptProvider)
+	if a.memoryProvider != nil {
+		if sp, ok := a.memoryProvider.(SystemPromptProvider); ok {
+			if block := sp.SystemPromptBlock(); block != "" {
+				sb.WriteString("\n\n")
+				sb.WriteString(block)
+			}
+		}
+	}
+
 	// Skills guidance — use SkillLoader when available, fallback to local filesystem
 	var skillsPrompt string
 	if a.skillLoader != nil {

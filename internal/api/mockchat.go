@@ -89,30 +89,30 @@ func getEnvOr(key, fallback string) string {
 
 // chatReq / chatResp match the OpenAI /v1/chat/completions format.
 type chatReq struct {
-	Model    string         `json:"model"`
-	Messages []chatMessage  `json:"messages"`
-	Stream   bool           `json:"stream"`
+	Model    string        `json:"model"`
+	Messages []chatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
 }
 
 type chatResp struct {
-	ID      string           `json:"id"`
-	Object string           `json:"object"`
-	Created int64            `json:"created"`
-	Model   string           `json:"model"`
-	Choices []chatChoice    `json:"choices"`
-	Usage   chatUsage        `json:"usage"`
+	ID      string       `json:"id"`
+	Object  string       `json:"object"`
+	Created int64        `json:"created"`
+	Model   string       `json:"model"`
+	Choices []chatChoice `json:"choices"`
+	Usage   chatUsage    `json:"usage"`
 }
 
 type chatChoice struct {
-	Index        int          `json:"index"`
-	Message      chatMessage  `json:"message"`
-	FinishReason string       `json:"finish_reason"`
+	Index        int         `json:"index"`
+	Message      chatMessage `json:"message"`
+	FinishReason string      `json:"finish_reason"`
 }
 
 type chatUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens     int `json:"total_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, userID, sessionID string, messages []chatMessage) (string, error) {
@@ -420,7 +420,7 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Usage: chatUsage{
 			PromptTokens:     42,
 			CompletionTokens: len(reply) / 4,
-			TotalTokens:     42 + len(reply)/4,
+			TotalTokens:      42 + len(reply)/4,
 		},
 	})
 }
@@ -432,8 +432,8 @@ type sessionsResp struct {
 }
 
 type sessionInfo struct {
-	SessionID  string `json:"session_id"`
-	MessageCount int  `json:"message_count"`
+	SessionID    string `json:"session_id"`
+	MessageCount int    `json:"message_count"`
 }
 
 // handleMockSessionList handles GET /v1/mock-sessions.
@@ -455,7 +455,7 @@ func (h *mockChatHandler) handleSessionList(w http.ResponseWriter, r *http.Reque
 	for _, s := range sessions {
 		count, _ := h.store.Messages().CountBySession(ctx, tenantID, s.ID)
 		result = append(result, sessionInfo{
-			SessionID:   s.ID,
+			SessionID:    s.ID,
 			MessageCount: count,
 		})
 	}

@@ -45,6 +45,7 @@ type AIAgent struct {
 	tenantID              string
 	userID                string
 	memoryProvider        tools.MemoryProvider
+	soulContent           string
 	skipContextFiles      bool
 	skipMemory            bool
 	persistSession        bool

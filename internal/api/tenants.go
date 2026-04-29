@@ -1,23 +1,38 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
 
-// TenantHandler serves CRUD endpoints for /v1/tenants.
-type TenantHandler struct {
-	store store.TenantStore
+// TenantHandlerOption configures a TenantHandler.
+type TenantHandlerOption func(*TenantHandler)
+
+// WithOnTenantCreated registers a callback invoked asynchronously after tenant creation.
+func WithOnTenantCreated(fn func(ctx context.Context, tenantID string)) TenantHandlerOption {
+	return func(h *TenantHandler) { h.onCreated = fn }
 }
 
-func NewTenantHandler(s store.TenantStore) *TenantHandler {
-	return &TenantHandler{store: s}
+// TenantHandler serves CRUD endpoints for /v1/tenants.
+type TenantHandler struct {
+	store     store.TenantStore
+	onCreated func(ctx context.Context, tenantID string)
+}
+
+func NewTenantHandler(s store.TenantStore, opts ...TenantHandlerOption) *TenantHandler {
+	h := &TenantHandler{store: s}
+	for _, o := range opts {
+		o(h)
+	}
+	return h
 }
 
 func (h *TenantHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +93,13 @@ func (h *TenantHandler) create(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.Create(r.Context(), &t); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
+	}
+	if h.onCreated != nil {
+		go func(id string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.onCreated(ctx, id)
+		}(t.ID)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
