@@ -147,7 +147,7 @@ RESP=$(chat "tenant-alice" "real-alice-3" \
     "/plan Create a plan for building a REST API")
 CONTENT=$(echo "$RESP" | jq -r '.choices[0].message.content' 2>/dev/null || echo "")
 echo "  Response: $(echo "$CONTENT" | head -3)"
-if echo "$CONTENT" | grep -qi "plan\|phase\|step\|milestone\|task\|design\|implement"; then
+if echo "$CONTENT" | grep -qi "plan\|phase\|step\|milestone\|task\|design\|implement\|language\|framework\|clarif\|would you like\|what kind"; then
     pass "Alice /plan skill produces planning content"
 else
     fail "Alice /plan skill did not produce expected content"

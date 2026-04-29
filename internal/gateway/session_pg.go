@@ -212,7 +212,7 @@ func (s *PGSessionStore) ensureLoaded() {
 			startedAt                        time.Time
 			inputTokens, outputTokens        int
 			cacheRead, cacheWrite            int
-			costUSD                          float64
+			costUSD                          *float64
 			metaJSON                         []byte
 		)
 
@@ -232,7 +232,9 @@ func (s *PGSessionStore) ensureLoaded() {
 			OutputTokens:     outputTokens,
 			CacheReadTokens:  cacheRead,
 			CacheWriteTokens: cacheWrite,
-			EstimatedCostUSD: costUSD,
+		}
+		if costUSD != nil {
+			entry.EstimatedCostUSD = *costUSD
 		}
 
 		if len(metaJSON) > 2 {

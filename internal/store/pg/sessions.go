@@ -28,14 +28,18 @@ func (s *pgSessionStore) Get(ctx context.Context, tenantID, sessionID string) (*
 		FROM sessions WHERE tenant_id = $1 AND id = $2`, tenantID, sessionID)
 
 	sess := &store.Session{}
+	var costUSD *float64
 	err := row.Scan(
 		&sess.ID, &sess.TenantID, &sess.Platform, &sess.UserID, &sess.Model,
 		&sess.SystemPrompt, &sess.ParentSessionID, &sess.Title, &sess.StartedAt,
 		&sess.EndedAt, &sess.EndReason, &sess.MessageCount, &sess.ToolCallCount,
 		&sess.InputTokens, &sess.OutputTokens, &sess.CacheReadTokens, &sess.CacheWriteTokens,
-		&sess.EstimatedCostUSD)
+		&costUSD)
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
+	}
+	if costUSD != nil {
+		sess.EstimatedCostUSD = *costUSD
 	}
 	return sess, nil
 }
@@ -69,9 +73,13 @@ func (s *pgSessionStore) List(ctx context.Context, tenantID string, opts store.L
 	var sessions []*store.Session
 	for rows.Next() {
 		s := &store.Session{}
+		var costUSD *float64
 		rows.Scan(&s.ID, &s.TenantID, &s.Platform, &s.UserID, &s.Model, &s.Title,
 			&s.StartedAt, &s.EndedAt, &s.MessageCount, &s.InputTokens, &s.OutputTokens,
-			&s.EstimatedCostUSD)
+			&costUSD)
+		if costUSD != nil {
+			s.EstimatedCostUSD = *costUSD
+		}
 		sessions = append(sessions, s)
 	}
 
