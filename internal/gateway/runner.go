@@ -343,7 +343,32 @@ func (r *Runner) handleGatewayCommand(event *MessageEvent, session *SessionEntry
 
 	knownCommands := GetGatewayKnownCommands()
 	if !knownCommands[command] {
-		// Not a known command, treat as regular message.
+		// Check if this slash command matches a skill available to this tenant.
+		ag, agErr := r.getOrCreateAgent(event, session)
+		if agErr == nil {
+			if ag.IsSkill("/" + command) {
+				// Inject full skill content and run agent.
+				skillContent, injectErr := ag.InjectSkill("/" + command)
+				if injectErr == nil {
+					augmented := *event
+					if args != "" {
+						augmented.Text = skillContent + "\n\n" + args
+					} else {
+						augmented.Text = skillContent
+					}
+					r.processWithAgent(r.ctx, &augmented, session)
+					return
+				}
+			}
+			// Unknown slash command — not a skill for this tenant.
+			adapter := r.GetAdapter(event.Source.Platform)
+			if adapter != nil {
+				adapter.Send(r.ctx, event.Source.ChatID,
+					fmt.Sprintf("Skill '/%s' not found for this account.", command), nil)
+				return
+			}
+		}
+		// Fallback: treat as regular message if agent creation failed.
 		r.processWithAgent(r.ctx, event, session)
 		return
 	}
