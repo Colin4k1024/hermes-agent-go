@@ -11,6 +11,7 @@ import (
 
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
+	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -23,8 +24,9 @@ type APIServerConfig struct {
 	AuthChain      *auth.ExtractorChain
 	RBAC           middleware.RBACConfig
 	RateLimit      middleware.RateLimitConfig
-	AllowedOrigins string // comma-separated list of allowed origins, or "*" for all
-	StaticDir      string // directory to serve static files from (optional)
+	AllowedOrigins string                  // comma-separated list of allowed origins, or "*" for all
+	StaticDir      string                  // directory to serve static files from (optional)
+	SkillsClient   *objstore.MinIOClient  // optional; nil disables per-tenant skill loading
 }
 
 // APIServer is the multi-tenant SaaS API HTTP server.
@@ -44,7 +46,7 @@ func spaFallback(mux, spa http.Handler, staticDir string) http.Handler {
 			http.ServeFile(w, r, staticDir+"/index.html")
 			return
 		}
-		if path == "/admin.html" || path == "/index.html" || path == "/isolation-test.html" {
+		if path == "/admin.html" || path == "/index.html" || path == "/isolation-test.html" || path == "/chat.html" {
 			http.ServeFile(w, r, staticDir+path)
 			return
 		}
@@ -116,7 +118,7 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	api.HandleFunc("DELETE /v1/gdpr/data", gdpr.DeleteHandler())
 
 	// Mock chat endpoints for multi-tenant isolation testing.
-	mockChat := newMockChatHandler()
+	mockChat := NewMockChatHandler(cfg.Store, cfg.SkillsClient)
 	api.HandleFunc("POST /v1/chat/completions", mockChat.ServeHTTP)
 	api.HandleFunc("GET /v1/mock-sessions", mockChat.handleSessionList)
 	api.HandleFunc("DELETE /v1/mock-sessions/", mockChat.handleClearSession)

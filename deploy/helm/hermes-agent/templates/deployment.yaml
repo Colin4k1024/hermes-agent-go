@@ -57,6 +57,14 @@ spec:
               value: {{ .Values.env.LLM_API_KEY | quote }}
             - name: LLM_MODEL
               value: {{ .Values.env.LLM_MODEL | quote }}
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.env.MINIO_ENDPOINT | quote }}
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.env.MINIO_ACCESS_KEY | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.env.MINIO_SECRET_KEY | quote }}
+            - name: MINIO_BUCKET
+              value: {{ .Values.env.MINIO_BUCKET | quote }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.liveness.path }}

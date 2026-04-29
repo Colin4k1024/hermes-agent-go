@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
+	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
+	"github.com/hermes-agent/hermes-agent-go/internal/skills"
+	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
 
 // chatMessage represents a single message in a session.
@@ -22,64 +25,39 @@ type chatMessage struct {
 	Content string `json:"content"`
 }
 
-// mockChatStore is a thread-safe in-memory store for sessions.
-// Messages are scoped to (tenantID, sessionID).
-type mockChatStore struct {
-	mu       sync.RWMutex
-	messages map[string][]chatMessage // key: "tenantID:sessionID"
-}
-
-func newMockChatStore() *mockChatStore {
-	return &mockChatStore{messages: make(map[string][]chatMessage)}
-}
-
-func (s *mockChatStore) sessionKey(tenantID, sessionID string) string {
-	return tenantID + ":" + sessionID
-}
-
-func (s *mockChatStore) GetMessages(tenantID, sessionID string) []chatMessage {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.messages[s.sessionKey(tenantID, sessionID)]
-}
-
-func (s *mockChatStore) AppendMessage(tenantID, sessionID, role, content string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := s.sessionKey(tenantID, sessionID)
-	s.messages[key] = append(s.messages[key], chatMessage{Role: role, Content: content})
-}
-
-func (s *mockChatStore) ClearSession(tenantID, sessionID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.messages, s.sessionKey(tenantID, sessionID))
-}
-
-func (s *mockChatStore) ClearAll() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.messages = make(map[string][]chatMessage)
-}
-
 // mockChatHandler handles chat requests. It stores messages per (tenant, session)
-// and calls a real LLM API to generate responses, enabling true multi-tenant
-// isolation testing with actual AI responses.
+// in PostgreSQL and calls a real LLM API to generate responses, enabling true
+// multi-tenant isolation with real AI responses and persistent conversation history.
 type mockChatHandler struct {
-	store     *mockChatStore
-	llmURL    string
-	llmAPIKey string
-	llmModel  string
-	httpClient *http.Client
+	store        store.Store
+	llmURL       string
+	llmAPIKey    string
+	llmModel     string
+	httpClient   *http.Client
+	skillsClient *objstore.MinIOClient
+
+	// skillsCache caches loaded skills per tenant with TTL to avoid
+	// re-fetching from MinIO on every request.
+	skillsCache    map[string]*skillsCacheEntry
+	skillsCacheMu  sync.RWMutex
 }
 
-func newMockChatHandler() *mockChatHandler {
+type skillsCacheEntry struct {
+	entries  []*skills.SkillEntry
+	loadedAt time.Time
+}
+
+const skillsCacheTTL = 5 * time.Minute
+
+func newMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mockChatHandler {
 	return &mockChatHandler{
-		store:     newMockChatStore(),
-		llmURL:    getEnvOr("LLM_API_URL", "http://localhost:8000"),
-		llmAPIKey: getEnvOr("LLM_API_KEY", "123456"),
-		llmModel:  getEnvOr("LLM_MODEL", "Qwen3-Coder-Next-4bit"),
-		httpClient: &http.Client{Timeout: 120 * time.Second},
+		store:        s,
+		llmURL:       getEnvOr("LLM_API_URL", "http://localhost:8000"),
+		llmAPIKey:    getEnvOr("LLM_API_KEY", "123456"),
+		llmModel:     getEnvOr("LLM_MODEL", "Qwen3-Coder-Next-4bit"),
+		httpClient:   &http.Client{Timeout: 120 * time.Second},
+		skillsClient: skillsClient,
+		skillsCache:  make(map[string]*skillsCacheEntry),
 	}
 }
 
@@ -122,10 +100,14 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID strin
 	// Build system prompt with tenant context
 	// Strip dashes from UUID so the first 8 chars are a compact, unique prefix.
 	tenantCompact := strings.ReplaceAll(tenantID, "-", "")
+
+	// Load per-tenant skills from MinIO (with in-process cache).
+	skillsPrompt := h.getSkillsPrompt(ctx, tenantID)
+
 	systemPrompt := fmt.Sprintf(
 		"You are a helpful assistant. Your tenant ID is '%s' and session ID is '%s'. "+
-			"Include BOTH in every reply in this exact format: [T:%s S:%s] — then your answer.",
-		tenantID, sessionID, tenantCompact[:8], sessionID,
+			"Include BOTH in every reply in this exact format: [T:%s S:%s] — then your answer.\n\n%s",
+		tenantID, sessionID, tenantCompact[:8], sessionID, skillsPrompt,
 	)
 
 	// Prepend system prompt
@@ -174,26 +156,91 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID strin
 	return llmResp.Choices[0].Message.Content, nil
 }
 
+// getSkillsPrompt returns the skills section of the system prompt for a tenant.
+// It caches loaded skills per tenant to avoid repeated MinIO fetches.
+// When MinIO is unavailable, it returns an empty string gracefully.
+func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) string {
+	if h.skillsClient == nil {
+		return ""
+	}
+
+	// Check cache first.
+	h.skillsCacheMu.RLock()
+	entry, ok := h.skillsCache[tenantID]
+	cacheValid := ok && time.Since(entry.loadedAt) < skillsCacheTTL
+	if cacheValid {
+		h.skillsCacheMu.RUnlock()
+		return skills.BuildSkillsPrompt(entry.entries)
+	}
+	h.skillsCacheMu.RUnlock()
+
+	// Load from MinIO.
+	loader := skills.NewMinIOSkillLoader(h.skillsClient, tenantID)
+	entries, err := loader.LoadAll(ctx)
+	if err != nil || len(entries) == 0 {
+		// Cache negative result briefly to avoid hammering MinIO.
+		if err != nil {
+			slog.Debug("skills_load_failed", "tenant", tenantID, "error", err)
+		}
+		h.skillsCacheMu.Lock()
+		h.skillsCache[tenantID] = &skillsCacheEntry{
+			entries:  nil,
+			loadedAt: time.Now(),
+		}
+		h.skillsCacheMu.Unlock()
+		return ""
+	}
+
+	// Update cache.
+	h.skillsCacheMu.Lock()
+	h.skillsCache[tenantID] = &skillsCacheEntry{
+		entries:  entries,
+		loadedAt: time.Now(),
+	}
+	h.skillsCacheMu.Unlock()
+
+	slog.Debug("skills_loaded", "tenant", tenantID, "count", len(entries))
+	return skills.BuildSkillsPrompt(entries)
+}
+
 // ServeHTTP handles POST /v1/chat/completions.
+// All messages are persisted to PostgreSQL and loaded from there on each request.
 func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract auth context (set by Auth middleware).
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
+	ctx := r.Context()
 	tenantID := ac.TenantID
 
-	// Session ID from header or generate one.
 	sessionID := r.Header.Get("X-Hermes-Session-Id")
 	if sessionID == "" {
 		sessionID = fmt.Sprintf("sess_%d", time.Now().UnixNano())
+	}
+
+	// Ensure session exists in PostgreSQL.
+	sess, err := h.store.Sessions().Get(ctx, tenantID, sessionID)
+	if err != nil || sess == nil {
+		sess = &store.Session{
+			ID:        sessionID,
+			TenantID:  tenantID,
+			Platform:  "api",
+			UserID:    ac.Identity,
+			Model:     h.llmModel,
+			StartedAt: time.Now(),
+		}
+		if createErr := h.store.Sessions().Create(ctx, tenantID, sess); createErr != nil {
+			slog.Warn("session_create_failed", "tenant", tenantID, "session", sessionID, "error", createErr)
+			http.Error(w, "session creation failed", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	var req chatReq
@@ -202,32 +249,58 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Append all messages to session store (for isolation verification).
+	// Persist incoming messages (skip empty or system messages).
 	for _, msg := range req.Messages {
-		if msg.Content == "" {
+		if msg.Content == "" || msg.Role == "system" {
 			continue
 		}
-		h.store.AppendMessage(tenantID, sessionID, msg.Role, msg.Content)
+		h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
+			TenantID:  tenantID,
+			SessionID: sessionID,
+			Role:     msg.Role,
+			Content:  msg.Content,
+		})
 	}
 
-	// Get conversation history for context.
-	history := h.store.GetMessages(tenantID, sessionID)
-
-	// Call real LLM.
-	reply, err := h.callLLM(r.Context(), tenantID, sessionID, history)
+	// Load full conversation history from PostgreSQL.
+	historyMsgs, err := h.store.Messages().List(ctx, tenantID, sessionID, 200, 0)
 	if err != nil {
-		slog.Warn("LLM call failed, returning error response", "error", err, "tenant", tenantID)
+		slog.Warn("messages_list_failed", "tenant", tenantID, "session", sessionID, "error", err)
+		historyMsgs = nil
+	}
+	history := make([]chatMessage, 0, len(historyMsgs))
+	for _, m := range historyMsgs {
+		history = append(history, chatMessage{Role: m.Role, Content: m.Content})
+	}
+
+	// Call LLM.
+	reply, err := h.callLLM(ctx, tenantID, sessionID, history)
+	if err != nil {
+		slog.Warn("LLM call failed", "error", err, "tenant", tenantID)
 		http.Error(w, fmt.Sprintf("LLM error: %v", err), http.StatusBadGateway)
 		return
 	}
 
-	// Append assistant response to session store.
-	h.store.AppendMessage(tenantID, sessionID, "assistant", reply)
+	// Persist assistant response.
+	msgID, _ := h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
+		TenantID:  tenantID,
+		SessionID: sessionID,
+		Role:     "assistant",
+		Content:  reply,
+	})
+
+	// Estimate tokens and update session counters.
+	approxTokens := (len(req.Messages)*50 + len(reply)) / 4
+	h.store.Sessions().UpdateTokens(ctx, tenantID, sessionID, store.TokenDelta{
+		Input:  approxTokens / 2,
+		Output: approxTokens / 2,
+	})
 
 	slog.Info("chat_completion",
 		"tenant", tenantID,
 		"session", sessionID,
 		"messages", len(history),
+		"msg_id", msgID,
 		"auth_method", ac.AuthMethod,
 		"model", h.llmModel,
 	)
@@ -270,27 +343,28 @@ func (h *mockChatHandler) handleSessionList(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	h.store.mu.RLock()
-	defer h.store.mu.RUnlock()
+	ctx := r.Context()
+	tenantID := ac.TenantID
+	sessions, _, err := h.store.Sessions().List(ctx, tenantID, store.ListOptions{Limit: 100, Offset: 0})
+	if err != nil {
+		sessions = nil
+	}
 
-	prefix := ac.TenantID + ":"
-	var sessions []sessionInfo
-	for key, msgs := range h.store.messages {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		sessionID := strings.TrimPrefix(key, prefix)
-		sessions = append(sessions, sessionInfo{
-			SessionID:   sessionID,
-			MessageCount: len(msgs),
+	result := make([]sessionInfo, 0, len(sessions))
+	for _, s := range sessions {
+		count, _ := h.store.Messages().CountBySession(ctx, tenantID, s.ID)
+		result = append(result, sessionInfo{
+			SessionID:   s.ID,
+			MessageCount: count,
 		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessionsResp{
-		TenantID: ac.TenantID,
-		Sessions: sessions,
+	_ = json.NewEncoder(w).Encode(sessionsResp{
+		TenantID: tenantID,
+		Sessions: result,
 	})
+	_ = err // suppress unused variable warning when sessions == nil
 }
 
 // handleMockClearSession handles DELETE /v1/mock-sessions/:id.
@@ -307,17 +381,12 @@ func (h *mockChatHandler) handleClearSession(w http.ResponseWriter, r *http.Requ
 	}
 
 	sessionID := strings.TrimPrefix(r.URL.Path, "/v1/mock-sessions/")
-	h.store.ClearSession(ac.TenantID, sessionID)
+	_ = h.store.Sessions().Delete(r.Context(), ac.TenantID, sessionID)
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// MockChatStore returns the underlying store for inspection.
-func (h *mockChatHandler) MockChatStore() *mockChatStore {
-	return h.store
-}
-
 // NewMockChatHandler creates a mock chat handler wired into the SaaS API server.
-func NewMockChatHandler() *mockChatHandler {
-	return newMockChatHandler()
+func NewMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mockChatHandler {
+	return newMockChatHandler(s, skillsClient)
 }

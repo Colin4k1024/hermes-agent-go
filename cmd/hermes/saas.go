@@ -15,6 +15,7 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/gateway/platforms"
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
+	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 	"github.com/hermes-agent/hermes-agent-go/internal/store/pg"
 	"github.com/jackc/pgx/v5"
@@ -128,7 +129,28 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		},
 	}
 
-	// ── 6. Build API server config ───────────────────────────
+	// ── 6. Initialize MinIO client for per-tenant skills and soul storage ──
+	var skillsClient *objstore.MinIOClient
+	if minioEndpoint := os.Getenv("MINIO_ENDPOINT"); minioEndpoint != "" {
+		minioAccessKey := os.Getenv("MINIO_ACCESS_KEY")
+		minioSecretKey := os.Getenv("MINIO_SECRET_KEY")
+		minioBucket := os.Getenv("MINIO_BUCKET")
+		if minioAccessKey != "" && minioSecretKey != "" && minioBucket != "" {
+			skillsClient, err = objstore.NewMinIOClient(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, false)
+			if err != nil {
+				slog.Warn("minio_client_init_failed", "endpoint", minioEndpoint, "error", err)
+				skillsClient = nil
+			} else {
+				if ensureErr := skillsClient.EnsureBucket(context.Background()); ensureErr != nil {
+					slog.Warn("minio_bucket_init_failed", "bucket", minioBucket, "error", ensureErr)
+				} else {
+					slog.Info("MinIO client initialized", "endpoint", minioEndpoint, "bucket", minioBucket)
+				}
+			}
+		}
+	}
+
+	// ── 7. Build API server config ───────────────────────────
 	serverCfg := api.APIServerConfig{
 		Port:           port,
 		Store:          dataStore,
@@ -138,11 +160,12 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		RateLimit:      rateLimitCfg,
 		AllowedOrigins: allowedOrigins,
 		StaticDir:      staticDir,
+		SkillsClient:   skillsClient,
 	}
 
 	saasServer := api.NewAPIServer(serverCfg)
 
-	// ── 7. Optionally start ACP server ────────────────────────
+	// ── 8. Optionally start ACP server ────────────────────────
 	var acpServer *acp.ACPServer
 	if acpPortStr := os.Getenv("HERMES_ACP_PORT"); acpPortStr != "" {
 		if acpPort, err := strconv.Atoi(acpPortStr); err == nil && acpPort > 0 {
@@ -150,7 +173,7 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// ── 8. OpenAI-compatible adapter ─────────────────────────
+	// ── 9. OpenAI-compatible adapter ─────────────────────────
 	if apiKey != "" {
 		adapterPortStr := os.Getenv("HERMES_API_PORT")
 		if adapterPortStr == "" {
@@ -168,7 +191,7 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// ── 9. Signal handling ──────────────────────────────────
+	// ── 10. Signal handling ──────────────────────────────────
 	done := make(chan struct{})
 	go func() {
 		sigCh := make(chan os.Signal, 1)

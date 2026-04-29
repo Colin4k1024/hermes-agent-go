@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes — Chat</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --accent: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; flex-shrink: 0; }
+  header h1 { font-size: 15px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .hdr { display: flex; align-items: center; gap: 6px; }
+  .hdr label { font-size: 11px; color: var(--muted); }
+  .hdr input { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+  .hdr input:focus { border-color: var(--accent); outline: none; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .conn-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .conn-dot.err { background: var(--red); }
+  button { cursor: pointer; font-family: inherit; border: none; border-radius: 5px; font-size: 12px;
+    font-weight: 500; padding: 5px 12px; transition: opacity .15s; }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-red { background: var(--red); color: #fff; }
+
+  /* Layout */
+  .main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+  /* Left sidebar */
+  .sidebar { width: 260px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-hdr { padding: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; }
+  .sidebar-hdr input { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; font-size: 12px; padding: 4px 8px; flex: 1; }
+  .sessions-list { flex: 1; overflow-y: auto; }
+  .session-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer;
+    display: flex; align-items: center; gap: 8px; transition: background .1s; }
+  .session-item:hover { background: var(--surface2); }
+  .session-item.active { background: var(--surface2); border-left: 2px solid var(--accent); }
+  .session-item .si-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .session-item .si-name { font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-item .si-meta { font-size: 10px; color: var(--muted); }
+  .new-chat-btn { margin: 12px; padding: 8px; background: var(--accent); color: #fff; border-radius: 6px;
+    font-size: 13px; font-weight: 600; text-align: center; border: none; cursor: pointer; }
+  .new-chat-btn:hover { opacity: 0.9; }
+
+  /* Center chat area */
+  .chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .chat-msgs { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .msg { max-width: 72%; padding: 10px 14px; border-radius: 10px; font-size: 14px;
+    line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { background: var(--accent); color: #fff; align-self: flex-end;
+    border-bottom-right-radius: 3px; }
+  .msg.assistant { background: var(--surface2); border: 1px solid var(--border);
+    align-self: flex-start; border-bottom-left-radius: 3px; }
+  .msg .msg-meta { font-size: 10px; opacity: 0.6; margin-top: 4px; }
+  .msg.assistant .msg-meta { color: var(--muted); }
+  .msg.error { background: rgba(248,81,73,.1); border: 1px solid var(--red); color: var(--red);
+    font-size: 12px; }
+  .typing { font-size: 12px; color: var(--muted); padding: 8px 14px; align-self: flex-start; }
+
+  /* Welcome */
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--muted); padding: 40px; text-align: center; }
+  .welcome h2 { font-size: 22px; color: var(--text); }
+  .welcome p { font-size: 14px; max-width: 400px; }
+  .welcome-features { display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+  .welcome-feat { font-size: 12px; background: var(--surface2); border: 1px solid var(--border);
+    padding: 8px 14px; border-radius: 8px; }
+  .welcome-feat span { color: var(--accent); font-weight: 600; }
+
+  /* Footer composer */
+  .composer { padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0; }
+  .composer textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; font-family: inherit; resize: none;
+    min-height: 44px; max-height: 200px; line-height: 1.5; }
+  .composer textarea:focus { border-color: var(--accent); outline: none; }
+  .composer textarea:disabled { opacity: 0.5; }
+  .send-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn:hover:not(:disabled) { opacity: 0.9; }
+
+  /* Right panel */
+  .right-panel { width: 260px; flex-shrink: 0; background: var(--surface); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .rp-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .rp-tab { flex: 1; padding: 8px; font-size: 11px; text-align: center; cursor: pointer; color: var(--muted);
+    border-bottom: 2px solid transparent; }
+  .rp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .rp-content { flex: 1; overflow-y: auto; padding: 12px; }
+  .info-section { margin-bottom: 16px; }
+  .info-section h4 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 8px; }
+  .info-row { display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--muted); }
+  .info-value { font-family: monospace; font-size: 11px; color: var(--accent); max-width: 140px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audit-entry { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 6px; font-size: 11px; }
+  .audit-entry .ae-action { font-family: monospace; color: var(--accent); font-size: 10px; }
+  .audit-entry .ae-meta { color: var(--muted); margin-top: 3px; font-size: 10px; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .sidebar, .right-panel { display: none; }
+    .msg { max-width: 88%; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hermes Chat</h1>
+
+  <div class="hdr">
+    <label>API URL</label>
+    <input id="cfgUrl" value="http://localhost:18080" placeholder="http://localhost:8080" style="width:200px">
+  </div>
+
+  <div class="hdr">
+    <label>API Key</label>
+    <input id="cfgKey" type="password" placeholder="hk_..." style="width:220px">
+  </div>
+
+  <div class="hdr">
+    <label>Session</label>
+    <input id="cfgSession" placeholder="auto-generate" style="width:140px">
+  </div>
+
+  <button class="btn btn-ghost" id="btnConnect" onclick="connect()">Connect</button>
+  <button class="btn btn-ghost" id="btnNewSession" onclick="newSession()" disabled>+ New</button>
+  <button class="btn btn-ghost" id="btnClear" onclick="clearChat()" disabled>Clear</button>
+  <button class="btn btn-ghost" id="btnAudit" onclick="showTab('audit')">Audit</button>
+
+  <div class="conn-dot" id="connDot" title="Not connected"></div>
+  <span id="connLabel" style="font-size:11px;color:var(--muted)">Not connected</span>
+</header>
+
+<div class="main">
+  <!-- Sidebar: sessions -->
+  <div class="sidebar">
+    <div class="sidebar-hdr">
+      <input id="searchSessions" placeholder="Search sessions..." oninput="filterSessions()">
+    </div>
+    <button class="new-chat-btn" id="btnNewChat" onclick="newChat()" disabled>+ New Chat</button>
+    <div class="sessions-list" id="sessionsList"></div>
+  </div>
+
+  <!-- Center: chat -->
+  <div class="chat-area">
+    <div class="chat-msgs" id="chatMsgs">
+      <div class="welcome" id="welcome">
+        <h2>Hermes Chat</h2>
+        <p>Connect with your API key to start chatting. Your conversation is isolated per session and tenant.</p>
+        <div class="welcome-features">
+          <div class="welcome-feat"><span>Multi-tenant</span> Isolation</div>
+          <div class="welcome-feat"><span>Real LLM</span> Responses</div>
+          <div class="welcome-feat"><span>Session</span> History</div>
+          <div class="welcome-feat"><span>SSE</span> Streaming</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <textarea id="msgInput" placeholder="Type your message..." rows="1"
+        onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMsg()" disabled>Send</button>
+    </div>
+  </div>
+
+  <!-- Right: info + audit -->
+  <div class="right-panel">
+    <div class="rp-tabs">
+      <div class="rp-tab active" id="tab-info" onclick="showTab('info')">Info</div>
+      <div class="rp-tab" id="tab-audit" onclick="showTab('audit')">Audit</div>
+    </div>
+    <div class="rp-content" id="rpContent">
+      <!-- Info tab -->
+      <div id="infoContent">
+        <div class="info-section">
+          <h4>Connection</h4>
+          <div class="info-row"><span class="info-label">Status</span><span class="info-value" id="infoStatus">—</span></div>
+          <div class="info-row"><span class="info-label">Tenant ID</span><span class="info-value" id="infoTenant">—</span></div>
+          <div class="info-row"><span class="info-label">Session ID</span><span class="info-value" id="infoSession">—</span></div>
+          <div class="info-row"><span class="info-label">Messages</span><span class="info-value" id="infoMsgs">0</span></div>
+        </div>
+        <div class="info-section">
+          <h4>Last Response</h4>
+          <div class="info-row"><span class="info-label">Model</span><span class="info-value" id="infoModel">—</span></div>
+          <div class="info-row"><span class="info-label">Tokens</span><span class="info-value" id="infoTokens">—</span></div>
+          <div class="info-row"><span class="info-label">Latency</span><span class="info-value" id="infoLatency">—</span></div>
+        </div>
+      </div>
+      <!-- Audit tab -->
+      <div id="auditContent" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const state = {
+  apiUrl: '',
+  apiKey: '',
+  sessionId: '',
+  tenantId: '',
+  connected: false,
+  messages: [], // {role, content, ts}
+  sessions: [], // [{id, preview, ts}]
+  pending: false,
+}
+
+// ── Connect ──────────────────────────────────────────────────
+async function connect() {
+  state.apiUrl = $('cfgUrl').value.replace(/\/$/, '')
+  state.apiKey = $('cfgKey').value.trim()
+  state.sessionId = $('cfgSession').value.trim() || `sess_${Date.now()}`
+  $('cfgSession').value = state.sessionId
+
+  if (!state.apiKey) { alert('Enter your API key (hk_...)'); return }
+
+  // Test the connection with a quick chat
+  const btn = $('btnConnect')
+  btn.textContent = 'Connecting...'
+  btn.disabled = true
+
+  try {
+    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.apiKey}`,
+        'X-Hermes-Session-Id': state.sessionId,
+      },
+      body: JSON.stringify({
+        model: 'test',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+    const reply = data.choices?.[0]?.message?.content || ''
+
+    state.connected = true
+    state.messages = []
+    $('connDot').className = 'conn-dot ok'
+    $('connLabel').textContent = 'Connected'
+    $('infoTenant').textContent = extractTenantId(reply)
+    $('infoSession').textContent = state.sessionId.slice(0, 20) + '...'
+    state.tenantId = extractTenantId(reply)
+    btn.textContent = 'Connected'
+    btn.style.background = 'var(--green)'
+    $('sendBtn').disabled = false
+    $('btnNewSession').disabled = false
+    $('btnClear').disabled = false
+    $('btnNewChat').disabled = false
+    $('msgInput').disabled = false
+    $('msgInput').focus()
+    $('cfgKey').disabled = true
+    $('cfgUrl').disabled = true
+
+    // Welcome → empty chat
+    $('welcome').style.display = 'none'
+    showTyping(false)
+    updateInfo()
+    await loadAudit()
+  } catch (e) {
+    btn.textContent = 'Connect'
+    btn.disabled = false
+    $('connDot').className = 'conn-dot err'
+    $('connLabel').textContent = 'Error: ' + e.message
+    alert('Connection failed: ' + e.message)
+  }
+}
+
+function extractTenantId(reply) {
+  const m = reply.match(/\[T:([a-f0-9]{8})/i)
+  return m ? `[T:${m[1]}]` : '—'
+}
+
+// ── Send message ─────────────────────────────────────────────
+async function sendMsg() {
+  if (state.pending || !state.connected) return
+  const input = $('msgInput')
+  const content = input.value.trim()
+  if (!content) return
+
+  input.value = ''
+  input.style.height = 'auto'
+
+  const startTs = Date.now()
+
+  // Add user message
+  state.messages.push({ role: 'user', content })
+  renderMessages()
+  updateInfo()
+
+  state.pending = true
+  $('sendBtn').disabled = true
+  showTyping(true)
+
+  try {
+    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.apiKey}`,
+        'X-Hermes-Session-Id': state.sessionId,
+      },
+      body: JSON.stringify({
+        model: 'test',
+        messages: state.messages.map(m => ({ role: m.role, content: m.content })),
+      }),
+    })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+    const reply = data.choices?.[0]?.message?.content || '(no response)'
+    const latency = Date.now() - startTs
+    const tokens = data.usage?.total_tokens || 0
+    const model = data.model || '—'
+
+    state.messages.push({ role: 'assistant', content: reply })
+
+    $('infoModel').textContent = model
+    $('infoTokens').textContent = tokens > 0 ? `${tokens} tok` : '—'
+    $('infoLatency').textContent = `${latency}ms`
+
+    // Add session to sidebar if new
+    addSessionToSidebar(state.sessionId, content.slice(0, 40))
+
+  } catch (e) {
+    state.messages.push({ role: 'assistant', content: `Error: ${e.message}`, error: true })
+  }
+
+  state.pending = false
+  $('sendBtn').disabled = false
+  showTyping(false)
+  renderMessages()
+  updateInfo()
+  await loadAudit()
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderMessages() {
+  const msgsEl = $('chatMsgs')
+  // Remove welcome if visible
+  const welcome = $('welcome')
+  if (welcome) welcome.style.display = 'none'
+
+  msgsEl.innerHTML = ''
+  for (const msg of state.messages) {
+    const el = document.createElement('div')
+    el.className = `msg ${msg.role}${msg.error ? ' error' : ''}`
+    el.textContent = msg.content
+    el.innerHTML += `<div class="msg-meta">${msg.role} · ${new Date().toLocaleTimeString()}</div>`
+    msgsEl.appendChild(el)
+  }
+  msgsEl.scrollTop = msgsEl.scrollHeight
+}
+
+function showTyping(show) {
+  let typing = $('typing')
+  if (show) {
+    if (!typing) {
+      typing = document.createElement('div')
+      typing.id = 'typing'
+      typing.className = 'typing'
+      typing.textContent = 'Hermes is typing...'
+      $('chatMsgs').appendChild(typing)
+    }
+    typing.style.display = ''
+    $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight
+  } else {
+    if (typing) typing.style.display = 'none'
+  }
+}
+
+// ── Session management ──────────────────────────────────────
+function newSession() {
+  state.sessionId = `sess_${Date.now()}`
+  $('cfgSession').value = state.sessionId
+  state.messages = []
+  $('chatMsgs').innerHTML = ''
+  const welcome = document.createElement('div')
+  welcome.className = 'welcome'
+  welcome.innerHTML = `<h2>New Session</h2><p>Session ID: ${state.sessionId}<br>Send a message to start.</p>`
+  $('chatMsgs').appendChild(welcome)
+  $('infoSession').textContent = state.sessionId.slice(0, 20) + '...'
+  $('infoMsgs').textContent = '0'
+  $('infoModel').textContent = '—'
+  $('infoTokens').textContent = '—'
+  $('infoLatency').textContent = '—'
+}
+
+function newChat() {
+  newSession()
+}
+
+function clearChat() {
+  state.messages = []
+  $('chatMsgs').innerHTML = ''
+  const welcome = document.createElement('div')
+  welcome.className = 'welcome'
+  welcome.innerHTML = `<h2>Chat Cleared</h2><p>Send a message to start a new conversation.</p>`
+  $('chatMsgs').appendChild(welcome)
+  $('infoMsgs').textContent = '0'
+}
+
+function addSessionToSidebar(id, preview) {
+  const list = $('sessionsList')
+  // Avoid duplicates
+  if (document.querySelector(`[data-session="${id}"]`)) return
+  const item = document.createElement('div')
+  item.className = 'session-item'
+  item.dataset.session = id
+  item.innerHTML = `<div class="si-dot"></div>
+    <div class="si-name">${escapeHtml(preview || 'New chat')}</div>
+    <div class="si-meta">${new Date().toLocaleTimeString()}</div>`
+  item.onclick = () => switchSession(id)
+  list.insertBefore(item, list.firstChild)
+}
+
+function switchSession(id) {
+  state.sessionId = id
+  $('cfgSession').value = id
+  // Mark active
+  document.querySelectorAll('.session-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.session === id)
+  })
+}
+
+function filterSessions() {
+  const q = $('searchSessions').value.toLowerCase()
+  document.querySelectorAll('.session-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none'
+  })
+}
+
+// ── Info panel ────────────────────────────────────────────────
+function updateInfo() {
+  $('infoMsgs').textContent = state.messages.length
+  $('infoStatus').textContent = state.connected ? 'Connected' : 'Disconnected'
+}
+
+// ── Audit ─────────────────────────────────────────────────────
+async function loadAudit() {
+  try {
+    const data = await api('/v1/audit-logs?limit=30')
+    const logs = data.audit_logs || []
+    const el = $('auditContent')
+    if (!logs.length) { el.innerHTML = '<p style="color:var(--muted);font-size:12px">No audit logs yet.</p>'; return }
+    el.innerHTML = logs.slice(0, 20).map(l => `
+      <div class="audit-entry">
+        <div class="ae-action">${escapeHtml(l.action || '—')}</div>
+        <div class="ae-meta">${l.tenant_id ? 'T:' + l.tenant_id.slice(0,8) : ''} · ${l.created_at ? new Date(l.created_at).toLocaleTimeString() : ''}</div>
+      </div>`).join('')
+  } catch (e) {
+    $('auditContent').innerHTML = `<p style="color:var(--red);font-size:12px">Failed: ${escapeHtml(e.message)}</p>`
+  }
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(state.apiUrl + path, {
+    ...options,
+    headers: { 'Authorization': `Bearer ${state.apiKey}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+// ── Tabs ─────────────────────────────────────────────────────
+function showTab(tab) {
+  $('tab-info').classList.toggle('active', tab === 'info')
+  $('tab-audit').classList.toggle('active', tab === 'audit')
+  $('infoContent').style.display = tab === 'info' ? '' : 'none'
+  $('auditContent').style.display = tab === 'audit' ? '' : 'none'
+  if (tab === 'audit') loadAudit()
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+// Auto-resize textarea
+$('msgInput').addEventListener('input', function () {
+  this.style.height = 'auto'
+  this.style.height = Math.min(this.scrollHeight, 200) + 'px'
+})
+
+// ── Init ─────────────────────────────────────────────────────
+$('msgInput').disabled = true
+</script>
+</body>
+</html>
