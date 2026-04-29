@@ -47,7 +47,7 @@ func TestAuditMiddleware(t *testing.T) {
 		{
 			name: "with AuthContext writes audit log",
 			authCtx: &auth.AuthContext{
-				Identity: "user-1",
+				Identity: "00000000-0000-0000-0000-000000000001",
 				TenantID: "t-1",
 				Roles:    []string{"user"},
 			},
@@ -57,7 +57,7 @@ func TestAuditMiddleware(t *testing.T) {
 			wantLogs:   1,
 			wantAction: "POST /v1/sessions",
 			wantTenant: "t-1",
-			wantUser:   "user-1",
+			wantUser:   "00000000-0000-0000-0000-000000000001",
 			wantDetail: "model=gpt-4",
 			wantStatus: http.StatusOK,
 		},

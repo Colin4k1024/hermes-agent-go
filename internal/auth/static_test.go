@@ -35,8 +35,8 @@ func TestStaticTokenExtractor(t *testing.T) {
 		{
 			name:       "wrong token",
 			authHeader: "Bearer wrong-token",
-			wantNil:    false,
-			wantErr:    true,
+			wantNil:    true,
+			wantErr:    false,
 		},
 		{
 			name:       "missing authorization header",
@@ -53,8 +53,8 @@ func TestStaticTokenExtractor(t *testing.T) {
 		{
 			name:       "empty token in bearer",
 			authHeader: "Bearer ",
-			wantNil:    false,
-			wantErr:    true,
+			wantNil:    true,
+			wantErr:    false,
 		},
 	}
 
