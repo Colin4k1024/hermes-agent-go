@@ -119,6 +119,13 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID strin
 	// Load per-tenant soul (persona) and skills from MinIO (both cached).
 	soulPrompt := h.getSoulPrompt(ctx, tenantID)
 	skillsPrompt := h.getSkillsPrompt(ctx, tenantID)
+	slog.Info("LLM_request",
+		"tenant", tenantID,
+		"session", sessionID,
+		"soul_bytes", len(soulPrompt),
+		"skills_bytes", len(skillsPrompt),
+		"soul_preview", fmt.Sprintf("%.80s", soulPrompt),
+	)
 
 	systemPrompt := fmt.Sprintf(
 		"%s\n\n%s\n\nYour tenant ID is '%s' and session ID is '%s'. "+
@@ -196,7 +203,7 @@ func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) 
 	if err != nil || len(entries) == 0 {
 		// Cache negative result briefly to avoid hammering MinIO.
 		if err != nil {
-			slog.Debug("skills_load_failed", "tenant", tenantID, "error", err)
+			slog.Info("skills_load_failed", "tenant", tenantID, "error", err)
 		}
 		h.skillsCacheMu.Lock()
 		h.skillsCache[tenantID] = &skillsCacheEntry{
@@ -215,7 +222,7 @@ func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) 
 	}
 	h.skillsCacheMu.Unlock()
 
-	slog.Debug("skills_loaded", "tenant", tenantID, "count", len(entries))
+	slog.Info("skills_loaded", "tenant", tenantID, "count", len(entries))
 	return skills.BuildSkillsPrompt(entries)
 }
 
@@ -240,7 +247,7 @@ func (h *mockChatHandler) getSoulPrompt(ctx context.Context, tenantID string) st
 	key := fmt.Sprintf("%s/SOUL.md", tenantID)
 	data, err := h.skillsClient.GetObject(ctx, key)
 	if err != nil || len(data) == 0 {
-		slog.Debug("soul_not_found", "tenant", tenantID, "key", key, "error", err)
+		slog.Info("soul_not_found", "tenant", tenantID, "key", key, "error", err)
 		h.soulCacheMu.Lock()
 		h.soulCache[tenantID] = &soulCacheEntry{
 			content:  defaultSoul,
@@ -262,8 +269,24 @@ func (h *mockChatHandler) getSoulPrompt(ctx context.Context, tenantID string) st
 	}
 	h.soulCacheMu.Unlock()
 
-	slog.Debug("soul_loaded", "tenant", tenantID, "bytes", len(data))
+	slog.Info("soul_loaded", "tenant", tenantID, "bytes", len(data), "preview", fmt.Sprintf("%.50s", content))
 	return content
+}
+
+// sendMsg is like Messages.Append but logs the result for debugging.
+func (h *mockChatHandler) sendMsg(ctx context.Context, tenantID, sessionID string, role, content string) int64 {
+	id, err := h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
+		TenantID:  tenantID,
+		SessionID: sessionID,
+		Role:      role,
+		Content:   content,
+	})
+	if err != nil {
+		slog.Error("sendMsg_FAILED", "tenant", tenantID, "session", sessionID, "role", role, "error", err)
+		return 0
+	}
+	slog.Info("sendMsg_OK", "tenant", tenantID, "session", sessionID, "role", role, "msg_id", id)
+	return id
 }
 
 // ServeHTTP handles POST /v1/chat/completions.
@@ -317,12 +340,7 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if msg.Content == "" || msg.Role == "system" {
 			continue
 		}
-		h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
-			TenantID:  tenantID,
-			SessionID: sessionID,
-			Role:     msg.Role,
-			Content:  msg.Content,
-		})
+		h.sendMsg(ctx, tenantID, sessionID, msg.Role, msg.Content)
 	}
 
 	// Load full conversation history from PostgreSQL.
@@ -345,12 +363,7 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Persist assistant response.
-	msgID, _ := h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
-		TenantID:  tenantID,
-		SessionID: sessionID,
-		Role:     "assistant",
-		Content:  reply,
-	})
+	msgID := h.sendMsg(ctx, tenantID, sessionID, "assistant", reply)
 
 	// Estimate tokens and update session counters.
 	approxTokens := (len(req.Messages)*50 + len(reply)) / 4
@@ -364,6 +377,7 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"session", sessionID,
 		"messages", len(history),
 		"msg_id", msgID,
+		"soul_loaded", h.soulCache != nil,
 		"auth_method", ac.AuthMethod,
 		"model", h.llmModel,
 	)

@@ -14,15 +14,39 @@ func (m *pgMessageStore) Append(ctx context.Context, tenantID, sessionID string,
 	if msg.Timestamp.IsZero() {
 		msg.Timestamp = time.Now()
 	}
+	// tool_calls is jsonb — pass nil if empty to avoid "invalid input syntax for type json".
+	var toolCalls any = nil
+	if msg.ToolCalls != "" {
+		toolCalls = []byte(msg.ToolCalls)
+	}
 	var id int64
 	err := m.pool.QueryRow(ctx, `
 		INSERT INTO messages (tenant_id, session_id, role, content, tool_call_id, tool_calls, tool_name, reasoning, timestamp, token_count, finish_reason)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id`,
-		tenantID, sessionID, msg.Role, msg.Content, msg.ToolCallID,
-		msg.ToolCalls, msg.ToolName, msg.Reasoning, msg.Timestamp,
-		msg.TokenCount, msg.FinishReason).Scan(&id)
+		tenantID, sessionID, msg.Role, msg.Content,
+		nullStr(msg.ToolCallID),
+		toolCalls,
+		nullStr(msg.ToolName),
+		nullStr(msg.Reasoning),
+		msg.Timestamp,
+		nullInt(msg.TokenCount),
+		nullStr(msg.FinishReason)).Scan(&id)
 	return id, err
+}
+
+func nullStr(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func nullInt(n int) any {
+	if n == 0 {
+		return nil
+	}
+	return n
 }
 
 func (m *pgMessageStore) List(ctx context.Context, tenantID, sessionID string, limit, offset int) ([]*store.Message, error) {
@@ -42,9 +66,30 @@ func (m *pgMessageStore) List(ctx context.Context, tenantID, sessionID string, l
 	var msgs []*store.Message
 	for rows.Next() {
 		msg := &store.Message{}
+		var toolCallID, toolName, reasoning, finishReason any
 		rows.Scan(&msg.ID, &msg.TenantID, &msg.SessionID, &msg.Role, &msg.Content,
-			&msg.ToolCallID, &msg.ToolCalls, &msg.ToolName, &msg.Reasoning,
-			&msg.Timestamp, &msg.TokenCount, &msg.FinishReason)
+			&toolCallID, &msg.ToolCalls, &toolName, &reasoning,
+			&msg.Timestamp, &msg.TokenCount, &finishReason)
+		if toolCallID != nil {
+			if v, ok := toolCallID.(string); ok {
+				msg.ToolCallID = v
+			}
+		}
+		if toolName != nil {
+			if v, ok := toolName.(string); ok {
+				msg.ToolName = v
+			}
+		}
+		if reasoning != nil {
+			if v, ok := reasoning.(string); ok {
+				msg.Reasoning = v
+			}
+		}
+		if finishReason != nil {
+			if v, ok := finishReason.(string); ok {
+				msg.FinishReason = v
+			}
+		}
 		msgs = append(msgs, msg)
 	}
 	return msgs, nil

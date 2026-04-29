@@ -2,7 +2,7 @@ package pg
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
@@ -25,18 +25,45 @@ func (s *pgSessionStore) Get(ctx context.Context, tenantID, sessionID string) (*
 		SELECT id, tenant_id, platform, user_id, model, system_prompt, parent_session_id,
 		       title, started_at, ended_at, end_reason, message_count, tool_call_count,
 		       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, estimated_cost_usd
-		FROM sessions WHERE tenant_id = $1 AND id = $2`, tenantID, sessionID)
+		FROM sessions WHERE id = $1 AND tenant_id = $2`, sessionID, tenantID)
 
 	sess := &store.Session{}
 	var costUSD *float64
+	var systemPrompt, parentSessionID, title, endReason any
 	err := row.Scan(
 		&sess.ID, &sess.TenantID, &sess.Platform, &sess.UserID, &sess.Model,
-		&sess.SystemPrompt, &sess.ParentSessionID, &sess.Title, &sess.StartedAt,
-		&sess.EndedAt, &sess.EndReason, &sess.MessageCount, &sess.ToolCallCount,
+		&systemPrompt, &parentSessionID, &title, &sess.StartedAt,
+		&sess.EndedAt, &endReason, &sess.MessageCount, &sess.ToolCallCount,
 		&sess.InputTokens, &sess.OutputTokens, &sess.CacheReadTokens, &sess.CacheWriteTokens,
 		&costUSD)
+	// Assign nullable string fields after scan (NULL → empty string, not error).
+	// pgx returns NOT NULL columns as plain string, NULL columns as nil.
+	if systemPrompt != nil {
+		if ps, ok := systemPrompt.(string); ok {
+			sess.SystemPrompt = ps
+		}
+	}
+	if parentSessionID != nil {
+		if ps, ok := parentSessionID.(string); ok {
+			sess.ParentSessionID = ps
+		}
+	}
+	if title != nil {
+		if t, ok := title.(string); ok {
+			sess.Title = t
+		}
+	}
+	if endReason != nil {
+		if er, ok := endReason.(string); ok {
+			sess.EndReason = er
+		}
+	}
 	if err != nil {
-		return nil, fmt.Errorf("session not found: %w", err)
+		// pgx.ErrNoRows means session not found — return nil, nil (not an error).
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+		return nil, nil // not found
 	}
 	if costUSD != nil {
 		sess.EstimatedCostUSD = *costUSD
@@ -74,9 +101,15 @@ func (s *pgSessionStore) List(ctx context.Context, tenantID string, opts store.L
 	for rows.Next() {
 		s := &store.Session{}
 		var costUSD *float64
-		rows.Scan(&s.ID, &s.TenantID, &s.Platform, &s.UserID, &s.Model, &s.Title,
+		var title any
+		rows.Scan(&s.ID, &s.TenantID, &s.Platform, &s.UserID, &s.Model, &title,
 			&s.StartedAt, &s.EndedAt, &s.MessageCount, &s.InputTokens, &s.OutputTokens,
 			&costUSD)
+		if title != nil {
+			if t, ok := title.(string); ok {
+				s.Title = t
+			}
+		}
 		if costUSD != nil {
 			s.EstimatedCostUSD = *costUSD
 		}
