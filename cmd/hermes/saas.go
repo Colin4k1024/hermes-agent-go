@@ -203,6 +203,9 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		}
 		if adapterPort, err := strconv.Atoi(adapterPortStr); err == nil && adapterPort > 0 {
 			gwCfg := gateway.DefaultGatewayConfig()
+			gwCfg.AllowedUsers = map[string]any{
+				"api": []any{"*"},
+			}
 			runner := gateway.NewRunner(gwCfg, pgStore.Pool())
 
 			adapter := platforms.NewAPIServerAdapter(adapterPort, apiKey)

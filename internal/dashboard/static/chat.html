@@ -135,12 +135,22 @@
 
   <div class="hdr">
     <label>API URL</label>
-    <input id="cfgUrl" value="http://localhost:18080" placeholder="http://localhost:8080" style="width:200px">
+    <input id="cfgUrl" value="http://localhost:18081" placeholder="http://localhost:18081" style="width:200px">
   </div>
 
   <div class="hdr">
     <label>API Key</label>
-    <input id="cfgKey" type="password" placeholder="hk_..." style="width:220px">
+    <input id="cfgKey" value="test-secret-key" placeholder="API key" style="width:220px">
+  </div>
+
+  <div class="hdr">
+    <label>Tenant ID</label>
+    <input id="cfgTenant" value="4dc54180-f365-43be-85c2-8cabe24f8b3a" placeholder="tenant UUID" style="width:220px">
+  </div>
+
+  <div class="hdr">
+    <label>Model</label>
+    <input id="cfgModel" value="qwen3:30b" placeholder="model name" style="width:120px">
   </div>
 
   <div class="hdr">
@@ -236,10 +246,12 @@ const state = {
 async function connect() {
   state.apiUrl = $('cfgUrl').value.replace(/\/$/, '')
   state.apiKey = $('cfgKey').value.trim()
+  state.tenantId = $('cfgTenant').value.trim()
+  state.model = $('cfgModel').value.trim() || 'qwen3:30b'
   state.sessionId = $('cfgSession').value.trim() || `sess_${Date.now()}`
   $('cfgSession').value = state.sessionId
 
-  if (!state.apiKey) { alert('Enter your API key (hk_...)'); return }
+  if (!state.apiKey) { alert('Enter your API key'); return }
 
   // Test the connection with a quick chat
   const btn = $('btnConnect')
@@ -247,15 +259,17 @@ async function connect() {
   btn.disabled = true
 
   try {
-    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
+    const hdrs = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${state.apiKey}`,
         'X-Hermes-Session-Id': state.sessionId,
-      },
+      }
+    if (state.tenantId) hdrs['X-Hermes-Tenant-Id'] = state.tenantId
+    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: hdrs,
       body: JSON.stringify({
-        model: 'test',
+        model: state.model,
         messages: [{ role: 'user', content: 'Hi' }],
       }),
     })
@@ -272,9 +286,9 @@ async function connect() {
     state.messages = []
     $('connDot').className = 'conn-dot ok'
     $('connLabel').textContent = 'Connected'
-    $('infoTenant').textContent = extractTenantId(reply)
+    $('infoTenant').textContent = state.tenantId || extractTenantId(reply)
     $('infoSession').textContent = state.sessionId.slice(0, 20) + '...'
-    state.tenantId = extractTenantId(reply)
+    if (!state.tenantId) state.tenantId = extractTenantId(reply)
     btn.textContent = 'Connected'
     btn.style.background = 'var(--green)'
     $('sendBtn').disabled = false
@@ -327,15 +341,17 @@ async function sendMsg() {
   showTyping(true)
 
   try {
-    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
+    const hdrs2 = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${state.apiKey}`,
         'X-Hermes-Session-Id': state.sessionId,
-      },
+      }
+    if (state.tenantId) hdrs2['X-Hermes-Tenant-Id'] = state.tenantId
+    const res = await fetch(`${state.apiUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: hdrs2,
       body: JSON.stringify({
-        model: 'test',
+        model: state.model,
         messages: state.messages.map(m => ({ role: m.role, content: m.content })),
       }),
     })
