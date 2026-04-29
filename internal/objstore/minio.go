@@ -87,3 +87,19 @@ func (m *MinIOClient) ListObjects(ctx context.Context, prefix string) ([]string,
 func (m *MinIOClient) Bucket() string {
 	return m.bucket
 }
+
+func (m *MinIOClient) DeleteObject(ctx context.Context, key string) error {
+	return m.client.RemoveObject(ctx, m.bucket, key, minio.RemoveObjectOptions{})
+}
+
+func (m *MinIOClient) ObjectExists(ctx context.Context, key string) (bool, error) {
+	_, err := m.client.StatObject(ctx, m.bucket, key, minio.StatObjectOptions{})
+	if err != nil {
+		errResp := minio.ToErrorResponse(err)
+		if errResp.Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}

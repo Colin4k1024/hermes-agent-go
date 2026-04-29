@@ -13,10 +13,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hermes-agent/hermes-agent-go/internal/agent"
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/skills"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // chatMessage represents a single message in a session.
@@ -30,6 +32,7 @@ type chatMessage struct {
 // multi-tenant isolation with real AI responses and persistent conversation history.
 type mockChatHandler struct {
 	store        store.Store
+	pool         *pgxpool.Pool // direct pool access for memory operations
 	llmURL       string
 	llmAPIKey    string
 	llmModel     string
@@ -63,9 +66,10 @@ const soulCacheTTL = 30 * time.Minute
 const defaultSoul = `You are a helpful, knowledgeable, and friendly AI assistant.
 Be concise, accurate, and helpful in all your responses.`
 
-func newMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mockChatHandler {
+func newMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *mockChatHandler {
 	return &mockChatHandler{
 		store:        s,
+		pool:         pool,
 		llmURL:       getEnvOr("LLM_API_URL", "http://localhost:8000"),
 		llmAPIKey:    getEnvOr("LLM_API_KEY", "123456"),
 		llmModel:     getEnvOr("LLM_MODEL", "Qwen3-Coder-Next-4bit"),
@@ -111,7 +115,7 @@ type chatUsage struct {
 	TotalTokens     int `json:"total_tokens"`
 }
 
-func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID string, messages []chatMessage) (string, error) {
+func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, userID, sessionID string, messages []chatMessage) (string, error) {
 	// Build system prompt with tenant context
 	// Strip dashes from UUID so the first 8 chars are a compact, unique prefix.
 	tenantCompact := strings.ReplaceAll(tenantID, "-", "")
@@ -127,10 +131,14 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID strin
 		"soul_preview", fmt.Sprintf("%.80s", soulPrompt),
 	)
 
+	// Inject user memories into system prompt for cross-session recall.
+	memoryBlock := h.buildMemoryBlock(ctx, tenantID, userID)
+	recentContext := h.buildRecentSessionContext(ctx, tenantID, userID, sessionID)
+
 	systemPrompt := fmt.Sprintf(
-		"%s\n\n%s\n\nYour tenant ID is '%s' and session ID is '%s'. "+
+		"%s\n\n%s\n\n%s\n\n%s\n\nYour tenant ID is '%s' and session ID is '%s'. "+
 			"Include BOTH in every reply in this exact format: [T:%s S:%s] — then your answer.",
-		soulPrompt, skillsPrompt, tenantID, sessionID, tenantCompact[:8], sessionID,
+		soulPrompt, skillsPrompt, memoryBlock, recentContext, tenantID, sessionID, tenantCompact[:8], sessionID,
 	)
 
 	// Prepend system prompt
@@ -355,8 +363,11 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		history = append(history, chatMessage{Role: m.Role, Content: m.Content})
 	}
 
-	// Call LLM.
-	reply, err := h.callLLM(ctx, tenantID, sessionID, history)
+	// Extract user ID for memory operations.
+	userID := ac.Identity
+
+	// Call LLM with memory context.
+	reply, err := h.callLLM(ctx, tenantID, userID, sessionID, history)
 	if err != nil {
 		slog.Warn("LLM call failed", "error", err, "tenant", tenantID)
 		http.Error(w, fmt.Sprintf("LLM error: %v", err), http.StatusBadGateway)
@@ -365,6 +376,18 @@ func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Persist assistant response.
 	msgID := h.sendMsg(ctx, tenantID, sessionID, "assistant", reply)
+
+	// Extract and persist user memories (rule-based, zero LLM cost).
+	if h.pool != nil {
+		extractor := &memoryExtractor{pool: h.pool}
+		for _, msg := range req.Messages {
+			if msg.Role == "user" && msg.Content != "" {
+				if memories := extractor.extract(msg.Content); len(memories) > 0 {
+					extractor.persist(tenantID, userID, memories)
+				}
+			}
+		}
+	}
 
 	// Estimate tokens and update session counters.
 	approxTokens := (len(req.Messages)*50 + len(reply)) / 4
@@ -464,7 +487,71 @@ func (h *mockChatHandler) handleClearSession(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// buildMemoryBlock loads user memories from PG and formats them for the system prompt.
+func (h *mockChatHandler) buildMemoryBlock(ctx context.Context, tenantID, userID string) string {
+	if h.pool == nil {
+		return ""
+	}
+	provider := agent.NewPGMemoryProvider(h.pool, tenantID, userID)
+	return provider.SystemPromptBlock()
+}
+
+// buildRecentSessionContext loads recent messages from other sessions for cross-session context.
+func (h *mockChatHandler) buildRecentSessionContext(ctx context.Context, tenantID, userID, currentSessionID string) string {
+	if h.pool == nil {
+		return ""
+	}
+	rows, err := h.pool.Query(ctx,
+		`SELECT s.id FROM sessions s
+		 WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id != $3
+		 ORDER BY s.started_at DESC LIMIT 3`, tenantID, userID, currentSessionID)
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+
+	var sessionIDs []string
+	for rows.Next() {
+		var sid string
+		if err := rows.Scan(&sid); err == nil {
+			sessionIDs = append(sessionIDs, sid)
+		}
+	}
+	if len(sessionIDs) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("[Recent conversation context from previous sessions]\n")
+	totalChars := 0
+	const maxChars = 4000
+
+	for _, sid := range sessionIDs {
+		msgRows, err := h.pool.Query(ctx,
+			`SELECT role, content FROM messages
+			 WHERE tenant_id = $1 AND session_id = $2
+			 ORDER BY timestamp DESC LIMIT 6`, tenantID, sid)
+		if err != nil {
+			continue
+		}
+		for msgRows.Next() {
+			var role, content string
+			if err := msgRows.Scan(&role, &content); err == nil {
+				line := fmt.Sprintf("- %s: %s\n", role, content)
+				if totalChars+len(line) > maxChars {
+					msgRows.Close()
+					return sb.String()
+				}
+				sb.WriteString(line)
+				totalChars += len(line)
+			}
+		}
+		msgRows.Close()
+	}
+	return sb.String()
+}
+
 // NewMockChatHandler creates a mock chat handler wired into the SaaS API server.
-func NewMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mockChatHandler {
-	return newMockChatHandler(s, skillsClient)
+func NewMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *mockChatHandler {
+	return newMockChatHandler(s, pool, skillsClient)
 }

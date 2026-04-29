@@ -155,6 +155,7 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 		Port:           port,
 		Store:          dataStore,
 		DB:             pgStore,
+		Pool:           pgStore.Pool(),
 		AuthChain:      authChain,
 		RBAC:           rbacCfg,
 		RateLimit:      rateLimitCfg,

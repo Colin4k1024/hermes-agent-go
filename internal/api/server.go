@@ -13,6 +13,7 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -24,6 +25,7 @@ type APIServerConfig struct {
 	AuthChain      *auth.ExtractorChain
 	RBAC           middleware.RBACConfig
 	RateLimit      middleware.RateLimitConfig
+	Pool           *pgxpool.Pool            // direct pool access for memory operations
 	AllowedOrigins string                  // comma-separated list of allowed origins, or "*" for all
 	StaticDir      string                  // directory to serve static files from (optional)
 	SkillsClient   *objstore.MinIOClient  // optional; nil disables per-tenant skill loading
@@ -70,7 +72,7 @@ func corsMiddleware(next http.Handler, origins string) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Hermes-Session-Id")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Hermes-Session-Id, X-Hermes-User-Id")
 		}
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
@@ -118,10 +120,18 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	api.HandleFunc("DELETE /v1/gdpr/data", gdpr.DeleteHandler())
 
 	// Mock chat endpoints for multi-tenant isolation testing.
-	mockChat := NewMockChatHandler(cfg.Store, cfg.SkillsClient)
+	mockChat := NewMockChatHandler(cfg.Store, cfg.Pool, cfg.SkillsClient)
 	api.HandleFunc("POST /v1/chat/completions", mockChat.ServeHTTP)
 	api.HandleFunc("GET /v1/mock-sessions", mockChat.handleSessionList)
 	api.HandleFunc("DELETE /v1/mock-sessions/", mockChat.handleClearSession)
+
+	// Memory management API (per-user long-term memory).
+	api.HandleFunc("GET /v1/memories", mockChat.handleListMemories)
+	api.HandleFunc("DELETE /v1/memories/", mockChat.handleDeleteMemory)
+
+	// Session history API (per-user session and message history).
+	api.HandleFunc("GET /v1/sessions", mockChat.handleListUserSessions)
+	api.HandleFunc("GET /v1/sessions/", mockChat.handleGetSessionMessages)
 
 	mux.Handle("/v1/", stack.Wrap(api))
 
