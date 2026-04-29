@@ -38,8 +38,12 @@ type mockChatHandler struct {
 
 	// skillsCache caches loaded skills per tenant with TTL to avoid
 	// re-fetching from MinIO on every request.
-	skillsCache    map[string]*skillsCacheEntry
-	skillsCacheMu  sync.RWMutex
+	skillsCache   map[string]*skillsCacheEntry
+	skillsCacheMu sync.RWMutex
+
+	// soulCache caches loaded soul per tenant (long TTL since souls change rarely).
+	soulCache   map[string]*soulCacheEntry
+	soulCacheMu sync.RWMutex
 }
 
 type skillsCacheEntry struct {
@@ -47,7 +51,17 @@ type skillsCacheEntry struct {
 	loadedAt time.Time
 }
 
+type soulCacheEntry struct {
+	content  string
+	loadedAt time.Time
+}
+
 const skillsCacheTTL = 5 * time.Minute
+const soulCacheTTL = 30 * time.Minute
+
+// defaultSoul is used when no per-tenant soul is found in MinIO.
+const defaultSoul = `You are a helpful, knowledgeable, and friendly AI assistant.
+Be concise, accurate, and helpful in all your responses.`
 
 func newMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mockChatHandler {
 	return &mockChatHandler{
@@ -58,6 +72,7 @@ func newMockChatHandler(s store.Store, skillsClient *objstore.MinIOClient) *mock
 		httpClient:   &http.Client{Timeout: 120 * time.Second},
 		skillsClient: skillsClient,
 		skillsCache:  make(map[string]*skillsCacheEntry),
+		soulCache:    make(map[string]*soulCacheEntry),
 	}
 }
 
@@ -101,13 +116,14 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, sessionID strin
 	// Strip dashes from UUID so the first 8 chars are a compact, unique prefix.
 	tenantCompact := strings.ReplaceAll(tenantID, "-", "")
 
-	// Load per-tenant skills from MinIO (with in-process cache).
+	// Load per-tenant soul (persona) and skills from MinIO (both cached).
+	soulPrompt := h.getSoulPrompt(ctx, tenantID)
 	skillsPrompt := h.getSkillsPrompt(ctx, tenantID)
 
 	systemPrompt := fmt.Sprintf(
-		"You are a helpful assistant. Your tenant ID is '%s' and session ID is '%s'. "+
-			"Include BOTH in every reply in this exact format: [T:%s S:%s] — then your answer.\n\n%s",
-		tenantID, sessionID, tenantCompact[:8], sessionID, skillsPrompt,
+		"%s\n\n%s\n\nYour tenant ID is '%s' and session ID is '%s'. "+
+			"Include BOTH in every reply in this exact format: [T:%s S:%s] — then your answer.",
+		soulPrompt, skillsPrompt, tenantID, sessionID, tenantCompact[:8], sessionID,
 	)
 
 	// Prepend system prompt
@@ -201,6 +217,53 @@ func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) 
 
 	slog.Debug("skills_loaded", "tenant", tenantID, "count", len(entries))
 	return skills.BuildSkillsPrompt(entries)
+}
+
+// getSoulPrompt returns the persona/soul content for a tenant.
+// It loads {tenantID}/SOUL.md from MinIO, caches it, and falls back to defaultSoul.
+func (h *mockChatHandler) getSoulPrompt(ctx context.Context, tenantID string) string {
+	if h.skillsClient == nil {
+		return defaultSoul
+	}
+
+	// Check cache first.
+	h.soulCacheMu.RLock()
+	entry, ok := h.soulCache[tenantID]
+	cacheValid := ok && time.Since(entry.loadedAt) < soulCacheTTL
+	if cacheValid {
+		h.soulCacheMu.RUnlock()
+		return entry.content
+	}
+	h.soulCacheMu.RUnlock()
+
+	// Load soul from MinIO: {tenantID}/SOUL.md
+	key := fmt.Sprintf("%s/SOUL.md", tenantID)
+	data, err := h.skillsClient.GetObject(ctx, key)
+	if err != nil || len(data) == 0 {
+		slog.Debug("soul_not_found", "tenant", tenantID, "key", key, "error", err)
+		h.soulCacheMu.Lock()
+		h.soulCache[tenantID] = &soulCacheEntry{
+			content:  defaultSoul,
+			loadedAt: time.Now(),
+		}
+		h.soulCacheMu.Unlock()
+		return defaultSoul
+	}
+
+	content := strings.TrimSpace(string(data))
+	if content == "" {
+		content = defaultSoul
+	}
+
+	h.soulCacheMu.Lock()
+	h.soulCache[tenantID] = &soulCacheEntry{
+		content:  content,
+		loadedAt: time.Now(),
+	}
+	h.soulCacheMu.Unlock()
+
+	slog.Debug("soul_loaded", "tenant", tenantID, "bytes", len(data))
+	return content
 }
 
 // ServeHTTP handles POST /v1/chat/completions.
