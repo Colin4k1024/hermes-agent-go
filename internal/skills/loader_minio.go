@@ -50,6 +50,7 @@ func (m *MinIOSkillLoader) LoadAll(ctx context.Context) ([]*SkillEntry, error) {
 		}
 
 		if !SkillMatchesPlatform(meta) {
+			slog.Debug("Skill skipped by platform filter", "key", key, "meta.Platforms", meta.Platforms, "currentPlatform", compilePlatform())
 			continue
 		}
 
@@ -60,6 +61,7 @@ func (m *MinIOSkillLoader) LoadAll(ctx context.Context) ([]*SkillEntry, error) {
 		})
 	}
 
+	slog.Debug("MinIOSkillLoader keys returned", "tenant", m.tenantID, "count", len(keys), "keys", keys)
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Meta.Name < entries[j].Meta.Name
 	})
