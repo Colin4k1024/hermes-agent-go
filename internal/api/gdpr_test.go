@@ -115,10 +115,12 @@ func (m *mockGDPRAuditStore) DeleteByTenant(_ context.Context, _ string) (int64,
 
 type mockGDPRTenantStore struct{}
 
-func (m *mockGDPRTenantStore) Create(_ context.Context, _ *store.Tenant) error        { return nil }
-func (m *mockGDPRTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error)  { return nil, nil }
-func (m *mockGDPRTenantStore) Update(_ context.Context, _ *store.Tenant) error         { return nil }
-func (m *mockGDPRTenantStore) Delete(_ context.Context, _ string) error                { return nil }
+func (m *mockGDPRTenantStore) Create(_ context.Context, _ *store.Tenant) error { return nil }
+func (m *mockGDPRTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error) {
+	return nil, nil
+}
+func (m *mockGDPRTenantStore) Update(_ context.Context, _ *store.Tenant) error { return nil }
+func (m *mockGDPRTenantStore) Delete(_ context.Context, _ string) error        { return nil }
 func (m *mockGDPRTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, nil
 }

@@ -34,8 +34,8 @@ type APIServerConfig struct {
 
 // APIServer is the multi-tenant SaaS API HTTP server.
 type APIServer struct {
-	cfg      APIServerConfig
-	server   *http.Server
+	cfg       APIServerConfig
+	server    *http.Server
 	AgentChat *chatHandler
 }
 
@@ -171,7 +171,7 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	}
 
 	s := &APIServer{
-		cfg:      cfg,
+		cfg:       cfg,
 		AgentChat: chatH,
 		server: &http.Server{
 			Addr:         fmt.Sprintf("0.0.0.0:%d", cfg.Port),

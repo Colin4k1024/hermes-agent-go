@@ -13,7 +13,7 @@ func TestRBACMiddleware(t *testing.T) {
 		name       string
 		cfg        RBACConfig
 		authCtx    *auth.AuthContext // nil means no AuthContext in request
-		method     string           // defaults to GET
+		method     string            // defaults to GET
 		path       string
 		wantStatus int
 	}{
