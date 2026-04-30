@@ -105,7 +105,11 @@ func newClientInternal(model, baseURL, apiKey, provider string, mode APIMode) (*
 		apiMode:  mode,
 	}
 
-	c.transport = newDefaultTransport(provider, baseURL, apiKey, model, mode)
+	t := newDefaultTransport(provider, baseURL, apiKey, model, mode)
+	if os.Getenv("HERMES_CIRCUIT_BREAKER_DISABLED") != "true" {
+		t = NewResilientTransport(t, model)
+	}
+	c.transport = t
 	slog.Info("Using LLM transport", "transport", c.transport.Name(), "model", model, "baseURL", baseURL)
 	return c, nil
 }

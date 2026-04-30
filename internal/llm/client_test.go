@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
@@ -36,7 +37,7 @@ func TestNewClientWithModeAnthropic(t *testing.T) {
 	if c.transport == nil {
 		t.Error("Expected transport to be initialized")
 	}
-	if c.transport.Name() != "anthropic" {
+	if !strings.HasPrefix(c.transport.Name(), "anthropic") {
 		t.Errorf("Expected anthropic transport, got '%s'", c.transport.Name())
 	}
 }
@@ -205,7 +206,7 @@ func TestNewClientWithMode_OpenAI(t *testing.T) {
 	if c.transport == nil {
 		t.Error("Expected transport to be initialized")
 	}
-	if c.transport.Name() != "openai" {
+	if !strings.HasPrefix(c.transport.Name(), "openai") {
 		t.Errorf("Expected openai transport, got '%s'", c.transport.Name())
 	}
 }

@@ -76,6 +76,11 @@ func WithCallbacks(cb *StreamCallbacks) AgentOption {
 	return func(a *AIAgent) { a.callbacks = cb }
 }
 
+// SetCallbacks replaces the streaming callbacks after construction.
+func (a *AIAgent) SetCallbacks(cb *StreamCallbacks) {
+	a.callbacks = cb
+}
+
 // WithEnabledToolsets sets the enabled toolsets.
 func WithEnabledToolsets(toolsets []string) AgentOption {
 	return func(a *AIAgent) { a.enabledToolsets = toolsets }

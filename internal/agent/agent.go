@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -192,7 +193,14 @@ func (a *AIAgent) Chat(message string) (string, error) {
 
 // RunConversation runs a full conversation turn with tool calling.
 func (a *AIAgent) RunConversation(userMessage string, history []llm.Message) (*ConversationResult, error) {
-	ctx := context.Background()
+	timeout := 120 * time.Second
+	if v := os.Getenv("HERMES_CONVERSATION_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			timeout = d
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	// Create session in DB
 	if a.sessionDB != nil {
