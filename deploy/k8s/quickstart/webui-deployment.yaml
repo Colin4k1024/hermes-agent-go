@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes-webui
+  namespace: hermes
+  labels:
+    app: hermes-webui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hermes-webui
+  template:
+    metadata:
+      labels:
+        app: hermes-webui
+    spec:
+      containers:
+        - name: webui
+          image: hermes-webui:local
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: HERMES_BACKEND_URL
+              value: "hermes-agent:8080"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes-webui
+  namespace: hermes
+spec:
+  type: NodePort
+  selector:
+    app: hermes-webui
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30081
+      name: http

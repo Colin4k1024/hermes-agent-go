@@ -10,9 +10,10 @@ namespace: hermes
 #   4. kubectl wait --for=condition=complete job/hermes-bootstrap --timeout=120s
 
 # Note: hermes-agent deployment already exists in the cluster (created separately).
-# This overlay only deploys the bootstrap Job + LLM config Secret.
+# This overlay deploys: bootstrap Job + LLM Secret + WebUI.
 resources:
   - bootstrap-job.yaml
+  - webui-deployment.yaml
 
 # Inject LLM credentials + admin token from config.env as a Secret
 secretGenerator:

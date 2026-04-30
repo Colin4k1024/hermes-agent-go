@@ -8,6 +8,7 @@ RUN npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:1.27-alpine
+RUN apk add --no-cache gettext  # provides envsubst
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 

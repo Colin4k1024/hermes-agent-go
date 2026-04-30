@@ -23,7 +23,7 @@ env:
   HERMES_API_PORT: "8081"
   HERMES_API_KEY: "dev-api-key-change-in-production"
   REDIS_URL: ""
-  LLM_API_URL: "http://10.191.110.127:8000"
+  LLM_API_URL: "http://10.191.110.127:8000/v1"
   LLM_API_KEY: "123456"
   LLM_MODEL: "Qwen3-Coder-Next-4bit"
   MINIO_ENDPOINT: "minio:9000"
