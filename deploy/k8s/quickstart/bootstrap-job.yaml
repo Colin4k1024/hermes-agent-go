@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: hermes-bootstrap
+  namespace: hermes
   labels:
     app: hermes-bootstrap
 spec:
@@ -24,17 +25,17 @@ spec:
               /scripts/bootstrap.sh
           env:
             - name: BASE_URL
-              value: "http://hermes-saas:8080"
+              value: "http://hermes-agent:8080"
             - name: MINIO_ENDPOINT
-              value: "hermes-minio:9000"
+              value: "minio:9000"
             - name: MINIO_ACCESS_KEY
-              value: "hermes"
+              value: "hermes-minio"
             - name: MINIO_SECRET_KEY
-              value: "hermespass"
+              value: "hermes-minio-password"
             - name: MINIO_BUCKET
               value: "hermes-skills"
             - name: FIXTURES_DIR
-              value: "/dev/null"
+              value: "/tmp/fixtures"
             - name: HERMES_ACP_TOKEN
               valueFrom:
                 secretKeyRef:
