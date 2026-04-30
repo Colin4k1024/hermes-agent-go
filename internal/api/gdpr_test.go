@@ -99,9 +99,13 @@ func (m *mockGDPRStore) Messages() store.MessageStore    { return m.ms }
 func (m *mockGDPRStore) Users() store.UserStore          { return nil }
 func (m *mockGDPRStore) Tenants() store.TenantStore      { return &mockGDPRTenantStore{} }
 func (m *mockGDPRStore) AuditLogs() store.AuditLogStore  { return m.al }
-func (m *mockGDPRStore) APIKeys() store.APIKeyStore      { return nil }
-func (m *mockGDPRStore) Close() error                    { return nil }
-func (m *mockGDPRStore) Migrate(_ context.Context) error { return nil }
+func (m *mockGDPRStore) APIKeys() store.APIKeyStore           { return nil }
+func (m *mockGDPRStore) Memories() store.MemoryStore           { return nil }
+func (m *mockGDPRStore) UserProfiles() store.UserProfileStore  { return nil }
+func (m *mockGDPRStore) CronJobs() store.CronJobStore          { return nil }
+func (m *mockGDPRStore) Roles() store.RoleStore                { return nil }
+func (m *mockGDPRStore) Close() error                          { return nil }
+func (m *mockGDPRStore) Migrate(_ context.Context) error       { return nil }
 
 type mockGDPRAuditStore struct{}
 

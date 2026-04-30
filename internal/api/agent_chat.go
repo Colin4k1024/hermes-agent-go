@@ -1,6 +1,7 @@
 package api
 
 import (
+	crypto_rand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -35,7 +36,9 @@ func (h *chatHandler) ServeAgentHTTP(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := r.Header.Get("X-Hermes-Session-Id")
 	if sessionID == "" {
-		sessionID = fmt.Sprintf("sess_%d", time.Now().UnixNano())
+		b := make([]byte, 16)
+		_, _ = crypto_rand.Read(b)
+		sessionID = fmt.Sprintf("sess_%x", b)
 	}
 
 	// Ensure session exists in PG.

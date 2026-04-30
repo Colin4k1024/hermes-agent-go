@@ -95,9 +95,13 @@ func (stubStore) Messages() store.MessageStore    { return stubMessageStore{} }
 func (stubStore) Users() store.UserStore          { return stubUserStore{} }
 func (stubStore) Tenants() store.TenantStore      { return stubTenantStore{} }
 func (stubStore) AuditLogs() store.AuditLogStore  { return stubAuditLogStore{} }
-func (stubStore) APIKeys() store.APIKeyStore      { return stubAPIKeyStore{} }
-func (stubStore) Close() error                    { return nil }
-func (stubStore) Migrate(_ context.Context) error { return nil }
+func (stubStore) APIKeys() store.APIKeyStore           { return stubAPIKeyStore{} }
+func (stubStore) Memories() store.MemoryStore           { return nil }
+func (stubStore) UserProfiles() store.UserProfileStore  { return nil }
+func (stubStore) CronJobs() store.CronJobStore          { return nil }
+func (stubStore) Roles() store.RoleStore                { return nil }
+func (stubStore) Close() error                          { return nil }
+func (stubStore) Migrate(_ context.Context) error       { return nil }
 
 func TestNewAPIServer(t *testing.T) {
 	tests := []struct {

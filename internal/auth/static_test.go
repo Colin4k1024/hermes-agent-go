@@ -27,7 +27,7 @@ func TestStaticTokenExtractor(t *testing.T) {
 			authHeader: "Bearer " + validToken,
 			wantNil:    false,
 			wantErr:    false,
-			wantID:     "static-user",
+			wantID:     "system:acp-admin",
 			wantTenant: tenantID,
 			wantRole:   "admin",
 			wantMethod: "static_token",

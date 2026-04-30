@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/hermes-agent/hermes-agent-go/internal/agent"
 	"github.com/hermes-agent/hermes-agent-go/internal/config"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
@@ -44,9 +45,8 @@ type Runner struct {
 	// Media cache for downloaded files.
 	mediaCache MediaCacher
 
-	// Agent cache to reuse agents per session (preserves prompt cache).
-	agentCache map[string]*agent.AIAgent
-	agentMu    sync.RWMutex
+	// Agent cache to reuse agents per session (LRU with TTL, preserves prompt cache).
+	agentCache *lru.LRU[string, *agent.AIAgent]
 
 	// Per-adapter error tracking for auto-disable.
 	adapterErrors   map[Platform]int
@@ -108,7 +108,7 @@ func NewRunner(gwCfg *GatewayConfig, pgPool *pgxpool.Pool) *Runner {
 		status:        NewRuntimeStatus(),
 		minioClient:   mc,
 		mediaCache:    NewMediaCache(),
-		agentCache:    make(map[string]*agent.AIAgent),
+		agentCache:    lru.NewLRU[string, *agent.AIAgent](200, nil, 5*time.Minute),
 		adapterErrors: make(map[Platform]int),
 		ctx:           ctx,
 		cancel:        cancel,
@@ -197,12 +197,12 @@ func (r *Runner) Stop() {
 	r.sessions.Close()
 
 	// Close all cached agents.
-	r.agentMu.Lock()
-	for key, ag := range r.agentCache {
-		ag.Close()
-		delete(r.agentCache, key)
+	for _, key := range r.agentCache.Keys() {
+		if ag, ok := r.agentCache.Get(key); ok {
+			ag.Close()
+		}
 	}
-	r.agentMu.Unlock()
+	r.agentCache.Purge()
 
 	slog.Info("Gateway runner stopped")
 }
@@ -530,12 +530,9 @@ func (r *Runner) processWithAgent(ctx context.Context, event *MessageEvent, sess
 
 // getOrCreateAgent returns a cached agent or creates a new one.
 func (r *Runner) getOrCreateAgent(event *MessageEvent, session *SessionEntry) (*agent.AIAgent, error) {
-	r.agentMu.RLock()
-	if ag, ok := r.agentCache[session.SessionKey]; ok {
-		r.agentMu.RUnlock()
+	if ag, ok := r.agentCache.Get(session.SessionKey); ok {
 		return ag, nil
 	}
-	r.agentMu.RUnlock()
 
 	// Create a new agent.
 	opts := []agent.AgentOption{
@@ -584,28 +581,16 @@ func (r *Runner) getOrCreateAgent(event *MessageEvent, session *SessionEntry) (*
 		return nil, err
 	}
 
-	// Cache it.
-	r.agentMu.Lock()
-	// Double-check after acquiring write lock.
-	if existing, ok := r.agentCache[session.SessionKey]; ok {
-		r.agentMu.Unlock()
-		ag.Close()
-		return existing, nil
-	}
-	r.agentCache[session.SessionKey] = ag
-	r.agentMu.Unlock()
-
+	// Cache it (LRU handles eviction and concurrency).
+	r.agentCache.Add(session.SessionKey, ag)
 	return ag, nil
 }
 
 // evictCachedAgent removes and closes a cached agent.
 func (r *Runner) evictCachedAgent(sessionKey string) {
-	r.agentMu.Lock()
-	defer r.agentMu.Unlock()
-
-	if ag, ok := r.agentCache[sessionKey]; ok {
+	if ag, ok := r.agentCache.Get(sessionKey); ok {
 		ag.Close()
-		delete(r.agentCache, sessionKey)
+		r.agentCache.Remove(sessionKey)
 	}
 }
 
@@ -748,10 +733,7 @@ func (r *Runner) reconnectAdapter(platform Platform, adapter PlatformAdapter) {
 // Memory persistence is handled by the agent's MemoryProvider during normal operations
 // (PG-backed agents write directly to PostgreSQL, filesystem agents write to disk).
 func (r *Runner) flushMemoriesForSession(sessionKey string) {
-	r.agentMu.RLock()
-	ag, ok := r.agentCache[sessionKey]
-	r.agentMu.RUnlock()
-
+	ag, ok := r.agentCache.Get(sessionKey)
 	if !ok || ag == nil {
 		return
 	}

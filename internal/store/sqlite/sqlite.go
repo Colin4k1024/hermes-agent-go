@@ -38,7 +38,11 @@ func (s *SQLiteStore) Messages() store.MessageStore    { return &sqliteMessages{
 func (s *SQLiteStore) Users() store.UserStore          { return &sqliteUsers{} }
 func (s *SQLiteStore) Tenants() store.TenantStore      { return &noopTenantStore{} }
 func (s *SQLiteStore) AuditLogs() store.AuditLogStore  { return &noopAuditLogStore{} }
-func (s *SQLiteStore) APIKeys() store.APIKeyStore      { return &noopAPIKeyStore{} }
+func (s *SQLiteStore) APIKeys() store.APIKeyStore           { return &noopAPIKeyStore{} }
+func (s *SQLiteStore) Memories() store.MemoryStore           { return &noopMemoryStore{} }
+func (s *SQLiteStore) UserProfiles() store.UserProfileStore  { return &noopUserProfileStore{} }
+func (s *SQLiteStore) CronJobs() store.CronJobStore          { return &noopCronJobStore{} }
+func (s *SQLiteStore) Roles() store.RoleStore                { return &noopRoleStore{} }
 func (s *SQLiteStore) Close() error                    { return s.db.Close() }
 func (s *SQLiteStore) Migrate(_ context.Context) error { return nil } // SQLite migrations handled by SessionDB
 

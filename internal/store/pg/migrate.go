@@ -165,6 +165,25 @@ var migrations = []migration{
 	{33, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS error_code TEXT`},
 	{34, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT`},
 	{35, `CREATE INDEX IF NOT EXISTS idx_audit_error_code ON audit_logs(error_code) WHERE error_code IS NOT NULL`},
+
+	// P1-S1: RBAC fine-grained permissions
+	{36, `CREATE TABLE IF NOT EXISTS roles (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		tenant_id UUID NOT NULL REFERENCES tenants(id),
+		name TEXT NOT NULL,
+		description TEXT,
+		is_system BOOLEAN DEFAULT false,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		UNIQUE(tenant_id, name)
+	)`},
+	{37, `CREATE TABLE IF NOT EXISTS role_permissions (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+		resource TEXT NOT NULL,
+		action TEXT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		UNIQUE(role_id, resource, action)
+	)`},
 }
 
 const migrationLockID int64 = 0x48455231 // "HER1" — advisory lock for migration exclusion

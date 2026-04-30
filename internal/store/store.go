@@ -14,6 +14,10 @@ type Store interface {
 	Tenants() TenantStore
 	AuditLogs() AuditLogStore
 	APIKeys() APIKeyStore
+	Memories() MemoryStore
+	UserProfiles() UserProfileStore
+	CronJobs() CronJobStore
+	Roles() RoleStore
 	Close() error
 	Migrate(ctx context.Context) error
 }
@@ -79,6 +83,47 @@ type APIKeyStore interface {
 	GetByID(ctx context.Context, tenantID, id string) (*APIKey, error)
 	List(ctx context.Context, tenantID string) ([]*APIKey, error)
 	Revoke(ctx context.Context, tenantID, id string) error
+}
+
+// MemoryStore manages per-user memory key-value pairs.
+type MemoryStore interface {
+	Get(ctx context.Context, tenantID, userID, key string) (string, error)
+	List(ctx context.Context, tenantID, userID string) ([]MemoryEntry, error)
+	Upsert(ctx context.Context, tenantID, userID, key, content string) error
+	Delete(ctx context.Context, tenantID, userID, key string) error
+	DeleteAllByUser(ctx context.Context, tenantID, userID string) (int64, error)
+	DeleteAllByTenant(ctx context.Context, tenantID string) (int64, error)
+}
+
+// UserProfileStore manages per-user profile content.
+type UserProfileStore interface {
+	Get(ctx context.Context, tenantID, userID string) (string, error)
+	Upsert(ctx context.Context, tenantID, userID, content string) error
+	Delete(ctx context.Context, tenantID, userID string) error
+	DeleteAllByTenant(ctx context.Context, tenantID string) (int64, error)
+}
+
+// RoleStore manages tenant-scoped roles and permissions.
+type RoleStore interface {
+	Create(ctx context.Context, role *Role) error
+	Get(ctx context.Context, tenantID, roleID string) (*Role, error)
+	GetByName(ctx context.Context, tenantID, name string) (*Role, error)
+	List(ctx context.Context, tenantID string) ([]*Role, error)
+	Delete(ctx context.Context, tenantID, roleID string) error
+	AddPermission(ctx context.Context, tenantID, roleName, resource, action string) error
+	RemovePermission(ctx context.Context, tenantID, roleName, resource, action string) error
+	ListPermissions(ctx context.Context, tenantID, roleName string) ([]*RolePermission, error)
+	HasPermission(ctx context.Context, roles []string, tenantID, resource, action string) (bool, error)
+}
+
+// CronJobStore manages scheduled job persistence.
+type CronJobStore interface {
+	Create(ctx context.Context, job *CronJob) error
+	Get(ctx context.Context, tenantID, jobID string) (*CronJob, error)
+	Update(ctx context.Context, job *CronJob) error
+	Delete(ctx context.Context, tenantID, jobID string) error
+	List(ctx context.Context, tenantID string) ([]*CronJob, error)
+	ListDue(ctx context.Context, now time.Time) ([]*CronJob, error)
 }
 
 // ListOptions controls pagination and filtering for list queries.

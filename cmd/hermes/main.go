@@ -23,7 +23,7 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/gateway/platforms"
 	"github.com/hermes-agent/hermes-agent-go/internal/skills"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
-	"github.com/hermes-agent/hermes-agent-go/internal/store/pg"
+	_ "github.com/hermes-agent/hermes-agent-go/internal/store/pg"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 )
@@ -407,11 +407,11 @@ func runGateway() error {
 		}
 		defer dataStore.Close()
 
-		pgStore, ok := dataStore.(*pg.PGStore)
+		pp, ok := dataStore.(store.PoolProvider)
 		if !ok {
-			return fmt.Errorf("expected PGStore from postgres driver, got %T", dataStore)
+			return fmt.Errorf("store driver does not support pool access (got %T)", dataStore)
 		}
-		pgPool = pgStore.Pool()
+		pgPool = pp.Pool()
 
 		// Configure PG memory provider for agent memory operations.
 		agent.SetPGMemoryPool(pgPool, gateway.DefaultTenantID)

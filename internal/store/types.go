@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 // Session represents a conversation session.
 type Session struct {
@@ -98,6 +102,64 @@ type AuditLog struct {
 	ErrorCode  string    `json:"error_code,omitempty" db:"error_code"`
 	UserAgent  string    `json:"user_agent,omitempty" db:"user_agent"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+}
+
+// MemoryEntry represents a per-user memory key-value pair.
+type MemoryEntry struct {
+	TenantID  string    `json:"tenant_id" db:"tenant_id"`
+	UserID    string    `json:"user_id" db:"user_id"`
+	Key       string    `json:"key" db:"key"`
+	Content   string    `json:"content" db:"content"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// UserProfile represents per-user profile content.
+type UserProfile struct {
+	TenantID  string    `json:"tenant_id" db:"tenant_id"`
+	UserID    string    `json:"user_id" db:"user_id"`
+	Content   string    `json:"content" db:"content"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// CronJob represents a scheduled job.
+type CronJob struct {
+	ID        string     `json:"id" db:"id"`
+	TenantID  string     `json:"tenant_id" db:"tenant_id"`
+	Name      string     `json:"name" db:"name"`
+	Prompt    string     `json:"prompt" db:"prompt"`
+	Schedule  string     `json:"schedule" db:"schedule"`
+	Deliver   string     `json:"deliver,omitempty" db:"deliver"`
+	Enabled   bool       `json:"enabled" db:"enabled"`
+	Model     string     `json:"model,omitempty" db:"model"`
+	NextRunAt *time.Time `json:"next_run_at,omitempty" db:"next_run_at"`
+	LastRunAt *time.Time `json:"last_run_at,omitempty" db:"last_run_at"`
+	RunCount  int        `json:"run_count" db:"run_count"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	Metadata  string     `json:"metadata,omitempty" db:"metadata"`
+}
+
+// Role represents a named role within a tenant.
+type Role struct {
+	ID          string    `json:"id" db:"id"`
+	TenantID    string    `json:"tenant_id" db:"tenant_id"`
+	Name        string    `json:"name" db:"name"`
+	Description string    `json:"description,omitempty" db:"description"`
+	IsSystem    bool      `json:"is_system" db:"is_system"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+}
+
+// RolePermission represents a resource+action grant on a role.
+type RolePermission struct {
+	ID        string    `json:"id" db:"id"`
+	RoleID    string    `json:"role_id" db:"role_id"`
+	Resource  string    `json:"resource" db:"resource"`
+	Action    string    `json:"action" db:"action"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// PoolProvider is optionally implemented by stores backed by pgxpool.
+type PoolProvider interface {
+	Pool() *pgxpool.Pool
 }
 
 // APIKey represents a hashed API key bound to a tenant.

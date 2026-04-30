@@ -29,7 +29,7 @@ func (s *StaticTokenExtractor) Extract(r *http.Request) (*AuthContext, error) {
 	}
 
 	return &AuthContext{
-		Identity:   "static-user",
+		Identity:   "system:acp-admin",
 		TenantID:   s.tenantID,
 		Roles:      []string{"admin"},
 		AuthMethod: "static_token",

@@ -19,7 +19,6 @@ import (
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/skills"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
-	"github.com/hermes-agent/hermes-agent-go/internal/store/pg"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 )
@@ -80,10 +79,15 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 	}
 	defer dataStore.Close()
 
-	pgStore, ok := dataStore.(*pg.PGStore)
+	poolProvider, ok := dataStore.(store.PoolProvider)
 	if !ok {
-		return fmt.Errorf("expected PGStore, got %T", dataStore)
+		return fmt.Errorf("store driver does not support pool access (got %T)", dataStore)
 	}
+	pool := poolProvider.Pool()
+	_ = pool // used by gateway runner and chat handler below
+
+	// pgStore aliases dataStore for backward compat with .Tenants()/.APIKeys() calls.
+	pgStore := dataStore
 
 	// ── 3. Seed default tenant (for static token auth) ────────
 	if acpToken != "" {
@@ -174,8 +178,8 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 	serverCfg := api.APIServerConfig{
 		Port:           port,
 		Store:          dataStore,
-		DB:             pgStore,
-		Pool:           pgStore.Pool(),
+		DB:             pool,
+		Pool:           pool,
 		AuthChain:      authChain,
 		RBAC:           rbacCfg,
 		RateLimit:      rateLimitCfg,
@@ -206,7 +210,7 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 			gwCfg.AllowedUsers = map[string]any{
 				"api": []any{"*"},
 			}
-			runner := gateway.NewRunner(gwCfg, pgStore.Pool())
+			runner := gateway.NewRunner(gwCfg, pool)
 
 			adapter := platforms.NewAPIServerAdapter(adapterPort, apiKey)
 			runner.RegisterAdapter(adapter)
@@ -261,7 +265,7 @@ func runSaaSAPI(cmd *cobra.Command, args []string) error {
 
 // seedDefaultTenant creates the default SaaS tenant if it does not already exist.
 // It is idempotent — calling it multiple times is safe.
-func seedDefaultTenant(ctx context.Context, pgStore *pg.PGStore) error {
+func seedDefaultTenant(ctx context.Context, pgStore store.Store) error {
 	const defaultTenantID = "00000000-0000-0000-0000-000000000001"
 
 	_, err := pgStore.Tenants().Get(ctx, defaultTenantID)

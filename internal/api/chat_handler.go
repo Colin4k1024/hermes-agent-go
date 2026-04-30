@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,16 +29,11 @@ type chatHandler struct {
 	httpClient   *http.Client
 	skillsClient *objstore.MinIOClient
 
-	soulCache   map[string]*soulCacheEntry
-	soulCacheMu sync.RWMutex
-}
-
-type soulCacheEntry struct {
-	content  string
-	loadedAt time.Time
+	soulCache *lru.LRU[string, string]
 }
 
 const soulCacheTTL = 30 * time.Minute
+const soulCacheMaxEntries = 500
 
 const defaultSoul = `You are a helpful, knowledgeable, and friendly AI assistant.
 Be concise, accurate, and helpful in all your responses.`
@@ -79,12 +74,9 @@ type chatUsage struct {
 }
 
 func (h *chatHandler) getSoulPrompt(ctx context.Context, tenantID string) string {
-	h.soulCacheMu.RLock()
-	if entry, ok := h.soulCache[tenantID]; ok && time.Since(entry.loadedAt) < soulCacheTTL {
-		h.soulCacheMu.RUnlock()
-		return entry.content
+	if content, ok := h.soulCache.Get(tenantID); ok {
+		return content
 	}
-	h.soulCacheMu.RUnlock()
 
 	if h.skillsClient == nil {
 		return defaultSoul
@@ -97,9 +89,7 @@ func (h *chatHandler) getSoulPrompt(ctx context.Context, tenantID string) string
 	}
 	content := string(raw)
 
-	h.soulCacheMu.Lock()
-	h.soulCache[tenantID] = &soulCacheEntry{content: content, loadedAt: time.Now()}
-	h.soulCacheMu.Unlock()
+	h.soulCache.Add(tenantID, content)
 	return content
 }
 
@@ -128,6 +118,6 @@ func NewChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.Mi
 		llmModel:     getEnvOr("LLM_MODEL", "Qwen3-Coder-Next-4bit"),
 		httpClient:   &http.Client{Timeout: 120 * time.Second},
 		skillsClient: skillsClient,
-		soulCache:    make(map[string]*soulCacheEntry),
+		soulCache:    lru.NewLRU[string, string](soulCacheMaxEntries, nil, soulCacheTTL),
 	}
 }
