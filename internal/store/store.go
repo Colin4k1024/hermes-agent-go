@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Store is the unified state persistence interface.
 // Implementations: pg.PGStore (production), sqlite.SQLiteStore (local dev).
@@ -48,14 +51,18 @@ type TenantStore interface {
 	Create(ctx context.Context, t *Tenant) error
 	Get(ctx context.Context, id string) (*Tenant, error)
 	Update(ctx context.Context, t *Tenant) error
-	Delete(ctx context.Context, id string) error // soft delete
+	Delete(ctx context.Context, id string) error // soft delete (sets deleted_at)
 	List(ctx context.Context, opts ListOptions) ([]*Tenant, int, error)
+	ListDeleted(ctx context.Context, olderThan time.Time) ([]*Tenant, error)
+	HardDelete(ctx context.Context, id string) error
+	Restore(ctx context.Context, id string) error
 }
 
 // AuditLogStore manages append-only audit trail.
 type AuditLogStore interface {
 	Append(ctx context.Context, log *AuditLog) error
 	List(ctx context.Context, tenantID string, opts AuditListOptions) ([]*AuditLog, int, error)
+	DeleteByTenant(ctx context.Context, tenantID string) (int64, error)
 }
 
 // AuditListOptions controls pagination for audit log queries.

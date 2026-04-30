@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"time"
+
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
@@ -39,6 +41,11 @@ func (m *mockMeTenantStore) Delete(_ context.Context, _ string) error        { r
 func (m *mockMeTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, nil
 }
+func (m *mockMeTenantStore) ListDeleted(_ context.Context, _ time.Time) ([]*store.Tenant, error) {
+	return nil, nil
+}
+func (m *mockMeTenantStore) HardDelete(_ context.Context, _ string) error { return nil }
+func (m *mockMeTenantStore) Restore(_ context.Context, _ string) error    { return nil }
 
 // authContextReq creates a request with an AuthContext in the context.
 func authContextReq(method, path string, ac *auth.AuthContext) *http.Request {

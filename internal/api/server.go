@@ -88,7 +88,7 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	stack := middleware.NewStack(middleware.StackConfig{
 		Metrics:   middleware.MetricsMiddleware,
 		RequestID: middleware.RequestIDMiddleware,
-		Auth:      middleware.AuthMiddleware(cfg.AuthChain, false),
+		Auth:      middleware.AuthMiddleware(cfg.AuthChain, false, cfg.Store.AuditLogs()),
 		Tenant:    middleware.TenantMiddleware,
 		Audit:     middleware.AuditMiddleware(cfg.Store.AuditLogs()),
 		RBAC:      middleware.RBACMiddleware(cfg.RBAC),
@@ -117,7 +117,7 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	me := NewMeHandler(cfg.Store)
 	api.Handle("/v1/me", me)
 
-	gdpr := NewGDPRHandler(cfg.Store.Sessions(), cfg.Store.Messages())
+	gdpr := NewGDPRHandler(cfg.Store, cfg.Pool)
 	api.HandleFunc("GET /v1/gdpr/export", gdpr.ExportHandler())
 	api.HandleFunc("DELETE /v1/gdpr/data", gdpr.DeleteHandler())
 

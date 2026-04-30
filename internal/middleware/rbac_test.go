@@ -13,6 +13,7 @@ func TestRBACMiddleware(t *testing.T) {
 		name       string
 		cfg        RBACConfig
 		authCtx    *auth.AuthContext // nil means no AuthContext in request
+		method     string           // defaults to GET
 		path       string
 		wantStatus int
 	}{
@@ -84,6 +85,53 @@ func TestRBACMiddleware(t *testing.T) {
 			path:       "/v1/data",
 			wantStatus: http.StatusOK,
 		},
+		{
+			name: "method+path rule matches DELETE",
+			cfg: RBACConfig{
+				DefaultRole: "user",
+				Rules:       map[string]string{"DELETE /v1/tenants": "admin"},
+			},
+			authCtx: &auth.AuthContext{
+				Identity: "u6",
+				TenantID: "t1",
+				Roles:    []string{"user"},
+			},
+			method:     http.MethodDelete,
+			path:       "/v1/tenants/t1",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "method+path rule allows GET on same path",
+			cfg: RBACConfig{
+				DefaultRole: "user",
+				Rules:       map[string]string{"DELETE /v1/tenants": "admin"},
+			},
+			authCtx: &auth.AuthContext{
+				Identity: "u7",
+				TenantID: "t1",
+				Roles:    []string{"user"},
+			},
+			path:       "/v1/tenants",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "method+path rule takes priority over path-only",
+			cfg: RBACConfig{
+				DefaultRole: "",
+				Rules: map[string]string{
+					"/v1/tenants":        "user",
+					"DELETE /v1/tenants": "admin",
+				},
+			},
+			authCtx: &auth.AuthContext{
+				Identity: "u8",
+				TenantID: "t1",
+				Roles:    []string{"user"},
+			},
+			method:     http.MethodDelete,
+			path:       "/v1/tenants/t1",
+			wantStatus: http.StatusForbidden,
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,7 +143,11 @@ func TestRBACMiddleware(t *testing.T) {
 			mw := RBACMiddleware(tt.cfg)
 			handler := mw(inner)
 
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			method := tt.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			req := httptest.NewRequest(method, tt.path, nil)
 			if tt.authCtx != nil {
 				ctx := auth.WithContext(req.Context(), tt.authCtx)
 				req = req.WithContext(ctx)

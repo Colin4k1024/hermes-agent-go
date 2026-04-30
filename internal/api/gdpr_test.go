@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
@@ -12,7 +13,7 @@ import (
 
 // mockSessionStore is a minimal in-memory implementation of store.SessionStore.
 type mockSessionStore struct {
-	sessions map[string]*store.Session // keyed by tenantID+sessionID
+	sessions map[string]*store.Session
 }
 
 func newMockSessionStore() *mockSessionStore {
@@ -58,7 +59,7 @@ func (m *mockSessionStore) SetTitle(_ context.Context, _, _, _ string) error { r
 
 // mockMessageStore is a minimal in-memory implementation of store.MessageStore.
 type mockMessageStore struct {
-	messages map[string][]*store.Message // keyed by sessionID
+	messages map[string][]*store.Message
 }
 
 func newMockMessageStore() *mockMessageStore {
@@ -85,6 +86,47 @@ func (m *mockMessageStore) Search(_ context.Context, _, _ string, _ int) ([]*sto
 func (m *mockMessageStore) CountBySession(_ context.Context, _, _ string) (int, error) {
 	return 0, nil
 }
+
+// mockGDPRStore wraps session/message stores to satisfy store.Store for GDPR tests.
+type mockGDPRStore struct {
+	ss *mockSessionStore
+	ms *mockMessageStore
+	al *mockGDPRAuditStore
+}
+
+func (m *mockGDPRStore) Sessions() store.SessionStore    { return m.ss }
+func (m *mockGDPRStore) Messages() store.MessageStore    { return m.ms }
+func (m *mockGDPRStore) Users() store.UserStore          { return nil }
+func (m *mockGDPRStore) Tenants() store.TenantStore      { return &mockGDPRTenantStore{} }
+func (m *mockGDPRStore) AuditLogs() store.AuditLogStore  { return m.al }
+func (m *mockGDPRStore) APIKeys() store.APIKeyStore      { return nil }
+func (m *mockGDPRStore) Close() error                    { return nil }
+func (m *mockGDPRStore) Migrate(_ context.Context) error { return nil }
+
+type mockGDPRAuditStore struct{}
+
+func (m *mockGDPRAuditStore) Append(_ context.Context, _ *store.AuditLog) error { return nil }
+func (m *mockGDPRAuditStore) List(_ context.Context, _ string, _ store.AuditListOptions) ([]*store.AuditLog, int, error) {
+	return nil, 0, nil
+}
+func (m *mockGDPRAuditStore) DeleteByTenant(_ context.Context, _ string) (int64, error) {
+	return 0, nil
+}
+
+type mockGDPRTenantStore struct{}
+
+func (m *mockGDPRTenantStore) Create(_ context.Context, _ *store.Tenant) error        { return nil }
+func (m *mockGDPRTenantStore) Get(_ context.Context, _ string) (*store.Tenant, error)  { return nil, nil }
+func (m *mockGDPRTenantStore) Update(_ context.Context, _ *store.Tenant) error         { return nil }
+func (m *mockGDPRTenantStore) Delete(_ context.Context, _ string) error                { return nil }
+func (m *mockGDPRTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
+	return nil, 0, nil
+}
+func (m *mockGDPRTenantStore) ListDeleted(_ context.Context, _ time.Time) ([]*store.Tenant, error) {
+	return nil, nil
+}
+func (m *mockGDPRTenantStore) HardDelete(_ context.Context, _ string) error { return nil }
+func (m *mockGDPRTenantStore) Restore(_ context.Context, _ string) error    { return nil }
 
 func gdprReq(method, path string, tenantID string) *http.Request {
 	req := httptest.NewRequest(method, path, nil)
@@ -144,7 +186,8 @@ func TestGDPRExportHandler(t *testing.T) {
 				tt.seedData(ss, ms)
 			}
 
-			handler := NewGDPRHandler(ss, ms).ExportHandler()
+			s := &mockGDPRStore{ss: ss, ms: ms, al: &mockGDPRAuditStore{}}
+			handler := NewGDPRHandler(s, nil).ExportHandler()
 			rec := httptest.NewRecorder()
 			req := gdprReq(tt.method, "/v1/gdpr/export", tt.tenantID)
 
@@ -202,12 +245,12 @@ func TestGDPRDeleteHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ss := newMockSessionStore()
-			ms := newMockMessageStore()
 			if tt.seedData != nil {
 				tt.seedData(ss)
 			}
 
-			handler := NewGDPRHandler(ss, ms).DeleteHandler()
+			s := &mockGDPRStore{ss: ss, ms: newMockMessageStore(), al: &mockGDPRAuditStore{}}
+			handler := NewGDPRHandler(s, nil).DeleteHandler()
 			rec := httptest.NewRecorder()
 			req := gdprReq(tt.method, "/v1/gdpr/data", tt.tenantID)
 

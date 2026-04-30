@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/agent"
@@ -169,6 +170,11 @@ func (h *chatHandler) ServeAgentHTTP(w http.ResponseWriter, r *http.Request) {
 		"msg_id", msgID,
 	)
 
+	if req.Stream {
+		h.serveSSE(w, r, sessionID, reply, result)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(chatResp{
 		ID:      sessionID,
@@ -186,4 +192,95 @@ func (h *chatHandler) ServeAgentHTTP(w http.ResponseWriter, r *http.Request) {
 			TotalTokens:      result.TotalTokens,
 		},
 	})
+}
+
+// SSE chunk types matching OpenAI chat.completion.chunk format.
+type sseChunkResp struct {
+	ID      string          `json:"id"`
+	Object  string          `json:"object"`
+	Created int64           `json:"created"`
+	Model   string          `json:"model"`
+	Choices []sseChunkDelta `json:"choices"`
+}
+
+type sseChunkDelta struct {
+	Index        int             `json:"index"`
+	Delta        sseChunkContent `json:"delta"`
+	FinishReason *string         `json:"finish_reason"`
+}
+
+type sseChunkContent struct {
+	Role    string `json:"role,omitempty"`
+	Content string `json:"content,omitempty"`
+}
+
+func (h *chatHandler) serveSSE(w http.ResponseWriter, r *http.Request, sessionID, reply string, result *agent.ConversationResult) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	created := time.Now().Unix()
+	chunkID := "chatcmpl-" + sessionID
+
+	writeSSE := func(data []byte) {
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	// First chunk: role announcement.
+	roleChunk, _ := json.Marshal(sseChunkResp{
+		ID: chunkID, Object: "chat.completion.chunk", Created: created, Model: h.llmModel,
+		Choices: []sseChunkDelta{{Index: 0, Delta: sseChunkContent{Role: "assistant"}}},
+	})
+	writeSSE(roleChunk)
+
+	// Stream content word-by-word with small delay for natural feel.
+	// A 15-second heartbeat keeps the connection alive during long pauses.
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
+	words := strings.Fields(reply)
+	for i, word := range words {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-heartbeat.C:
+			fmt.Fprintf(w, ": heartbeat\n\n")
+			flusher.Flush()
+		default:
+		}
+
+		content := word
+		if i < len(words)-1 {
+			content += " "
+		}
+
+		chunk, _ := json.Marshal(sseChunkResp{
+			ID: chunkID, Object: "chat.completion.chunk", Created: created, Model: h.llmModel,
+			Choices: []sseChunkDelta{{Index: 0, Delta: sseChunkContent{Content: content}}},
+		})
+		writeSSE(chunk)
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	// Final chunk: finish_reason=stop.
+	stop := "stop"
+	finalChunk, _ := json.Marshal(sseChunkResp{
+		ID: chunkID, Object: "chat.completion.chunk", Created: created, Model: h.llmModel,
+		Choices: []sseChunkDelta{{Index: 0, Delta: sseChunkContent{}, FinishReason: &stop}},
+	})
+	writeSSE(finalChunk)
+
+	// Terminator.
+	fmt.Fprintf(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }

@@ -35,6 +35,8 @@ func AuditMiddleware(auditStore store.AuditLogStore) Middleware {
 				RequestID:  RequestIDFromContext(r.Context()),
 				StatusCode: sw.status,
 				LatencyMs:  int(time.Since(start).Milliseconds()),
+				SourceIP:   r.RemoteAddr,
+				UserAgent:  r.UserAgent(),
 			}
 			if _, err := uuid.Parse(ac.Identity); err == nil {
 				entry.UserID = ac.Identity

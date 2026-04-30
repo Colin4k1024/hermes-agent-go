@@ -124,7 +124,7 @@ func NewChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.Mi
 		store:        s,
 		pool:         pool,
 		llmURL:       getEnvOr("LLM_API_URL", "http://localhost:8000"),
-		llmAPIKey:    getEnvOr("LLM_API_KEY", "123456"),
+		llmAPIKey:    getEnvOr("LLM_API_KEY", ""),
 		llmModel:     getEnvOr("LLM_MODEL", "Qwen3-Coder-Next-4bit"),
 		httpClient:   &http.Client{Timeout: 120 * time.Second},
 		skillsClient: skillsClient,

@@ -101,7 +101,6 @@ func init() {
 }
 
 func setupLogging() {
-	// Wire --profile flag to config before any config access.
 	if flagProfile != "" {
 		config.OverrideActiveProfile(flagProfile)
 	}
@@ -110,7 +109,17 @@ func setupLogging() {
 	if flagDebug || os.Getenv("HERMES_DEBUG") != "" {
 		level = slog.LevelDebug
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+	opts := &slog.HandlerOptions{Level: level}
+
+	var handler slog.Handler
+	logFmt := os.Getenv("LOG_FORMAT")
+	env := os.Getenv("HERMES_ENV")
+	if logFmt == "json" || env == "production" {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	}
+	slog.SetDefault(slog.New(handler))
 }
 
 func buildAgentOptions() []agent.AgentOption {

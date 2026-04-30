@@ -151,10 +151,42 @@ var migrations = []migration{
 	{25, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS status_code INT`},
 	{26, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS latency_ms INT`},
 	{27, `CREATE INDEX IF NOT EXISTS idx_audit_request ON audit_logs(request_id)`},
+
+	// P4: Soft delete + cascade + GDPR hardening
+	{28, `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`},
+	{29, `CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(id) WHERE deleted_at IS NULL`},
+	{30, `CREATE INDEX IF NOT EXISTS idx_tenants_deleted ON tenants(deleted_at) WHERE deleted_at IS NOT NULL`},
+
+	// Make audit_logs.tenant_id nullable (auth failure events have no tenant context).
+	{31, `ALTER TABLE audit_logs ALTER COLUMN tenant_id DROP NOT NULL`},
+
+	// Add source_ip, error_code, user_agent columns to audit_logs.
+	{32, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS source_ip TEXT`},
+	{33, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS error_code TEXT`},
+	{34, `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT`},
+	{35, `CREATE INDEX IF NOT EXISTS idx_audit_error_code ON audit_logs(error_code) WHERE error_code IS NOT NULL`},
 }
 
+const migrationLockID int64 = 0x48455231 // "HER1" — advisory lock for migration exclusion
+
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_version (
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire migration connection: %w", err)
+	}
+	defer conn.Release()
+
+	var locked bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, migrationLockID).Scan(&locked); err != nil {
+		return fmt.Errorf("advisory lock check: %w", err)
+	}
+	if !locked {
+		slog.Info("PG migrations skipped — another instance holds the lock")
+		return nil
+	}
+	defer conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, migrationLockID) //nolint:errcheck
+
+	_, err = conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_version (
 		version INT NOT NULL,
 		applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`)
@@ -163,7 +195,7 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	var current int
-	err = pool.QueryRow(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&current)
+	err = conn.QueryRow(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&current)
 	if err != nil {
 		return fmt.Errorf("read schema version: %w", err)
 	}
@@ -173,10 +205,10 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		if m.version <= current {
 			continue
 		}
-		if _, err := pool.Exec(ctx, m.sql); err != nil {
+		if _, err := conn.Exec(ctx, m.sql); err != nil {
 			return fmt.Errorf("migration v%d failed: %w", m.version, err)
 		}
-		if _, err := pool.Exec(ctx, `INSERT INTO schema_version (version) VALUES ($1)`, m.version); err != nil {
+		if _, err := conn.Exec(ctx, `INSERT INTO schema_version (version) VALUES ($1)`, m.version); err != nil {
 			return fmt.Errorf("record migration v%d: %w", m.version, err)
 		}
 		applied++

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/auth"
 	"github.com/hermes-agent/hermes-agent-go/internal/middleware"
@@ -58,6 +59,12 @@ func (m *mockTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store
 	}
 	return all, len(all), nil
 }
+
+func (m *mockTenantStore) ListDeleted(_ context.Context, _ time.Time) ([]*store.Tenant, error) {
+	return nil, nil
+}
+func (m *mockTenantStore) HardDelete(_ context.Context, _ string) error { return nil }
+func (m *mockTenantStore) Restore(_ context.Context, _ string) error    { return nil }
 
 func tenantReq(method, path string, body any, tenantID string, roles []string) *http.Request {
 	var buf bytes.Buffer
@@ -175,7 +182,7 @@ func TestTenantHandler(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
-			name:     "delete as admin returns 204",
+			name:     "delete as admin returns 202",
 			method:   http.MethodDelete,
 			path:     "/v1/tenants/t1",
 			tenantID: "admin-tenant",
@@ -183,7 +190,7 @@ func TestTenantHandler(t *testing.T) {
 			seedData: func(ms *mockTenantStore) {
 				ms.tenants["t1"] = &store.Tenant{ID: "t1", Name: "Tenant One"}
 			},
-			wantStatus: http.StatusNoContent,
+			wantStatus: http.StatusAccepted,
 		},
 		{
 			name:     "delete as non-admin returns 403",

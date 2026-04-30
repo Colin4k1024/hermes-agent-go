@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
@@ -26,6 +27,13 @@ func (n *noopTenantStore) Delete(_ context.Context, _ string) error { return err
 func (n *noopTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, errSQLiteUnsupported
 }
+func (n *noopTenantStore) ListDeleted(_ context.Context, _ time.Time) ([]*store.Tenant, error) {
+	return nil, errSQLiteUnsupported
+}
+func (n *noopTenantStore) HardDelete(_ context.Context, _ string) error {
+	return errSQLiteUnsupported
+}
+func (n *noopTenantStore) Restore(_ context.Context, _ string) error { return errSQLiteUnsupported }
 
 var _ store.TenantStore = (*noopTenantStore)(nil)
 
@@ -38,6 +46,9 @@ func (n *noopAuditLogStore) Append(_ context.Context, _ *store.AuditLog) error {
 }
 func (n *noopAuditLogStore) List(_ context.Context, _ string, _ store.AuditListOptions) ([]*store.AuditLog, int, error) {
 	return nil, 0, errSQLiteUnsupported
+}
+func (n *noopAuditLogStore) DeleteByTenant(_ context.Context, _ string) (int64, error) {
+	return 0, errSQLiteUnsupported
 }
 
 var _ store.AuditLogStore = (*noopAuditLogStore)(nil)

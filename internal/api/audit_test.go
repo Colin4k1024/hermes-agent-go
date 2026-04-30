@@ -21,6 +21,10 @@ func (m *mockAuditLogStore) Append(_ context.Context, log *store.AuditLog) error
 	return nil
 }
 
+func (m *mockAuditLogStore) DeleteByTenant(_ context.Context, _ string) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockAuditLogStore) List(_ context.Context, tenantID string, opts store.AuditListOptions) ([]*store.AuditLog, int, error) {
 	var filtered []*store.AuditLog
 	for _, l := range m.logs {

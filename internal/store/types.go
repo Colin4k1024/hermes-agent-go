@@ -73,13 +73,14 @@ type SearchResult struct {
 
 // Tenant represents a SaaS tenant.
 type Tenant struct {
-	ID           string    `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	Plan         string    `json:"plan" db:"plan"` // free / pro / enterprise
-	RateLimitRPM int       `json:"rate_limit_rpm" db:"rate_limit_rpm"`
-	MaxSessions  int       `json:"max_sessions" db:"max_sessions"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID           string     `json:"id" db:"id"`
+	Name         string     `json:"name" db:"name"`
+	Plan         string     `json:"plan" db:"plan"` // free / pro / enterprise
+	RateLimitRPM int        `json:"rate_limit_rpm" db:"rate_limit_rpm"`
+	MaxSessions  int        `json:"max_sessions" db:"max_sessions"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt    *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
 // AuditLog represents an immutable audit trail entry.
@@ -93,6 +94,9 @@ type AuditLog struct {
 	RequestID  string    `json:"request_id,omitempty" db:"request_id"`
 	StatusCode int       `json:"status_code,omitempty" db:"status_code"`
 	LatencyMs  int       `json:"latency_ms,omitempty" db:"latency_ms"`
+	SourceIP   string    `json:"source_ip,omitempty" db:"source_ip"`
+	ErrorCode  string    `json:"error_code,omitempty" db:"error_code"`
+	UserAgent  string    `json:"user_agent,omitempty" db:"user_agent"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 

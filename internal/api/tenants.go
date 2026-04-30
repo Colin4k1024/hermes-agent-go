@@ -172,5 +172,10 @@ func (h *TenantHandler) delete(w http.ResponseWriter, r *http.Request, id string
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "scheduled",
+		"message": "Tenant soft-deleted. Data will be purged after retention period.",
+	})
 }

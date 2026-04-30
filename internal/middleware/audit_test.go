@@ -29,6 +29,10 @@ func (m *mockAuditStore) List(_ context.Context, _ string, _ store.AuditListOpti
 	return m.logs, len(m.logs), nil
 }
 
+func (m *mockAuditStore) DeleteByTenant(_ context.Context, _ string) (int64, error) {
+	return 0, nil
+}
+
 func TestAuditMiddleware(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -100,6 +104,7 @@ func TestAuditMiddleware(t *testing.T) {
 				target += "?" + tt.query
 			}
 			req := httptest.NewRequest(tt.method, target, nil)
+			req.Header.Set("User-Agent", "test-audit-agent")
 			if tt.authCtx != nil {
 				ctx := auth.WithContext(req.Context(), tt.authCtx)
 				req = req.WithContext(ctx)
@@ -129,6 +134,12 @@ func TestAuditMiddleware(t *testing.T) {
 				}
 				if entry.Detail != tt.wantDetail {
 					t.Errorf("detail = %q, want %q", entry.Detail, tt.wantDetail)
+				}
+				if entry.SourceIP == "" {
+					t.Error("expected SourceIP to be populated")
+				}
+				if entry.UserAgent != "test-audit-agent" {
+					t.Errorf("user_agent = %q, want %q", entry.UserAgent, "test-audit-agent")
 				}
 			}
 		})

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
@@ -60,6 +61,11 @@ func (stubTenantStore) Delete(_ context.Context, _ string) error               {
 func (stubTenantStore) List(_ context.Context, _ store.ListOptions) ([]*store.Tenant, int, error) {
 	return nil, 0, nil
 }
+func (stubTenantStore) ListDeleted(_ context.Context, _ time.Time) ([]*store.Tenant, error) {
+	return nil, nil
+}
+func (stubTenantStore) HardDelete(_ context.Context, _ string) error { return nil }
+func (stubTenantStore) Restore(_ context.Context, _ string) error    { return nil }
 
 // stubAuditLogStore implements store.AuditLogStore with no-op methods.
 type stubAuditLogStore struct{}
@@ -68,6 +74,7 @@ func (stubAuditLogStore) Append(_ context.Context, _ *store.AuditLog) error { re
 func (stubAuditLogStore) List(_ context.Context, _ string, _ store.AuditListOptions) ([]*store.AuditLog, int, error) {
 	return nil, 0, nil
 }
+func (stubAuditLogStore) DeleteByTenant(_ context.Context, _ string) (int64, error) { return 0, nil }
 
 // stubAPIKeyStore implements store.APIKeyStore with no-op methods.
 type stubAPIKeyStore struct{}
