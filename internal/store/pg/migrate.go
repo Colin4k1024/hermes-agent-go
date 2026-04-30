@@ -184,6 +184,48 @@ var migrations = []migration{
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 		UNIQUE(role_id, resource, action)
 	)`},
+
+	// P3-S1: Row-Level Security policies on all tenant-scoped tables.
+	{38, `ALTER TABLE sessions ENABLE ROW LEVEL SECURITY`},
+	{39, `CREATE POLICY tenant_isolation_sessions ON sessions
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{40, `ALTER TABLE messages ENABLE ROW LEVEL SECURITY`},
+	{41, `CREATE POLICY tenant_isolation_messages ON messages
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{42, `ALTER TABLE users ENABLE ROW LEVEL SECURITY`},
+	{43, `CREATE POLICY tenant_isolation_users ON users
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{44, `ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY`},
+	{45, `CREATE POLICY tenant_isolation_audit ON audit_logs
+		USING (tenant_id::text = current_setting('app.current_tenant', true)
+		       OR tenant_id IS NULL)`},
+	{46, `ALTER TABLE memories ENABLE ROW LEVEL SECURITY`},
+	{47, `CREATE POLICY tenant_isolation_memories ON memories
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{48, `ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY`},
+	{49, `CREATE POLICY tenant_isolation_profiles ON user_profiles
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{50, `ALTER TABLE cron_jobs ENABLE ROW LEVEL SECURITY`},
+	{51, `CREATE POLICY tenant_isolation_cron ON cron_jobs
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{52, `ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY`},
+	{53, `CREATE POLICY tenant_isolation_apikeys ON api_keys
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+	{54, `ALTER TABLE roles ENABLE ROW LEVEL SECURITY`},
+	{55, `CREATE POLICY tenant_isolation_roles ON roles
+		USING (tenant_id::text = current_setting('app.current_tenant', true))`},
+
+	// P3-S2: Independent purge audit log table (not subject to RLS).
+	{56, `CREATE TABLE IF NOT EXISTS purge_audit_logs (
+		id BIGSERIAL PRIMARY KEY,
+		tenant_id UUID NOT NULL,
+		action TEXT NOT NULL,
+		detail TEXT,
+		rows_deleted BIGINT DEFAULT 0,
+		minio_objects_deleted INT DEFAULT 0,
+		duration_ms INT DEFAULT 0,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`},
 }
 
 const migrationLockID int64 = 0x48455231 // "HER1" — advisory lock for migration exclusion

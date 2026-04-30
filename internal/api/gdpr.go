@@ -65,19 +65,20 @@ func (h *GDPRHandler) ExportHandler() http.HandlerFunc {
 			Messages []*store.Message `json:"messages"`
 		}
 
-		// Collect memories via direct SQL.
+		// Collect all memories for tenant (across all users).
 		type memoryEntry struct {
+			UserID  string `json:"user_id"`
 			Key     string `json:"key"`
 			Content string `json:"content"`
 		}
 		var memories []memoryEntry
 		if h.pool != nil {
-			rows, err := h.pool.Query(ctx, `SELECT key, content FROM memories WHERE tenant_id = $1`, tenantID)
+			rows, err := h.pool.Query(ctx, `SELECT user_id, key, content FROM memories WHERE tenant_id = $1`, tenantID)
 			if err == nil {
 				defer rows.Close()
 				for rows.Next() {
 					var m memoryEntry
-					if err := rows.Scan(&m.Key, &m.Content); err == nil {
+					if err := rows.Scan(&m.UserID, &m.Key, &m.Content); err == nil {
 						memories = append(memories, m)
 					}
 				}
@@ -86,7 +87,7 @@ func (h *GDPRHandler) ExportHandler() http.HandlerFunc {
 			}
 		}
 
-		// Collect user profiles via direct SQL.
+		// Collect user profiles via Store interface.
 		type profileEntry struct {
 			UserID  string `json:"user_id"`
 			Content string `json:"content"`
@@ -106,6 +107,14 @@ func (h *GDPRHandler) ExportHandler() http.HandlerFunc {
 				log.Warn("gdpr export: failed to list profiles", "error", err)
 			}
 		}
+
+		// Audit the export action.
+		_ = h.store.AuditLogs().Append(ctx, &store.AuditLog{
+			TenantID:  tenantID,
+			Action:    "GDPR_EXPORT",
+			Detail:    fmt.Sprintf("sessions=%d memories=%d profiles=%d", len(sessions), len(memories), len(profiles)),
+			RequestID: middleware.RequestIDFromContext(ctx),
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=export.json")

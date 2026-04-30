@@ -22,14 +22,7 @@ func AuditMiddleware(auditStore store.AuditLogStore) Middleware {
 
 			next.ServeHTTP(sw, r)
 
-			ac, ok := auth.FromContext(r.Context())
-			if !ok || ac == nil {
-				return
-			}
-
-			// Only set UserID if Identity is a valid UUID (API keys use UUID; static tokens use "static-user" string).
 			entry := &store.AuditLog{
-				TenantID:   ac.TenantID,
 				Action:     r.Method + " " + r.URL.Path,
 				Detail:     sanitizeQuery(r.URL.RawQuery),
 				RequestID:  RequestIDFromContext(r.Context()),
@@ -38,9 +31,15 @@ func AuditMiddleware(auditStore store.AuditLogStore) Middleware {
 				SourceIP:   r.RemoteAddr,
 				UserAgent:  r.UserAgent(),
 			}
-			if _, err := uuid.Parse(ac.Identity); err == nil {
-				entry.UserID = ac.Identity
+
+			ac, ok := auth.FromContext(r.Context())
+			if ok && ac != nil {
+				entry.TenantID = ac.TenantID
+				if _, err := uuid.Parse(ac.Identity); err == nil {
+					entry.UserID = ac.Identity
+				}
 			}
+
 			if err := auditStore.Append(r.Context(), entry); err != nil {
 				observability.ContextLogger(r.Context()).Warn("audit log write failed", "error", err)
 			}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/hermes-agent/hermes-agent-go/internal/observability"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -37,6 +38,12 @@ func New(ctx context.Context, databaseURL string) (*PGStore, error) {
 		return nil, fmt.Errorf("pg parse config: %w", err)
 	}
 	poolCfg.ConnConfig.Tracer = &observability.PGXTracer{}
+
+	// AfterRelease hook: clear tenant context to prevent RLS variable leakage on connection reuse.
+	poolCfg.AfterRelease = func(conn *pgx.Conn) bool {
+		_, err := conn.Exec(context.Background(), "RESET ALL")
+		return err == nil // discard corrupted connections
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

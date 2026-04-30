@@ -66,11 +66,14 @@ func TestAuditMiddleware(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "no AuthContext skips audit log",
+			name:       "no AuthContext still writes audit log",
 			authCtx:    nil,
 			method:     http.MethodGet,
 			path:       "/v1/health",
-			wantLogs:   0,
+			wantLogs:   1,
+			wantAction: "GET /v1/health",
+			wantTenant: "",
+			wantUser:   "",
 			wantStatus: http.StatusOK,
 		},
 		{
