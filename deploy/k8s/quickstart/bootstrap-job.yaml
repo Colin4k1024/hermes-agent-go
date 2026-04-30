@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hermes-bootstrap
+  labels:
+    app: hermes-bootstrap
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: hermes-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: alpine:3.19
+          command:
+            - sh
+            - -c
+            - |
+              apk add --no-cache bash curl wget python3 ca-certificates 2>/dev/null
+              /scripts/bootstrap.sh
+          env:
+            - name: BASE_URL
+              value: "http://hermes-saas:8080"
+            - name: MINIO_ENDPOINT
+              value: "hermes-minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "hermes"
+            - name: MINIO_SECRET_KEY
+              value: "hermespass"
+            - name: MINIO_BUCKET
+              value: "hermes-skills"
+            - name: FIXTURES_DIR
+              value: "/dev/null"
+            - name: HERMES_ACP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-llm-config
+                  key: HERMES_ACP_TOKEN
+          volumeMounts:
+            - name: bootstrap-script
+              mountPath: /scripts
+      volumes:
+        - name: bootstrap-script
+          configMap:
+            name: hermes-bootstrap-script
+            defaultMode: 0755

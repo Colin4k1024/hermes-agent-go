@@ -1,5 +1,5 @@
 
-# Binary (root level only, don't ignore cmd/hermes/)
+# Binary outputs (root level and bin/, don't ignore cmd/hermes/)
 # Env
 # Go
 # IDE
@@ -21,5 +21,9 @@
 .vscode/
 /hermes
 /hermes-*
+/bin/
 Thumbs.db
 vendor/
+node_modules/
+# Generated test fixtures (written by bootstrap.sh / make quickstart)
+tests/fixtures/tenants.json

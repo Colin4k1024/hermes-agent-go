@@ -2,15 +2,77 @@ package skills
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hermes-agent/hermes-agent-go/internal/objstore"
 	"github.com/hermes-agent/hermes-agent-go/internal/store"
 )
+
+// TenantManifest tracks which skills a tenant has and their modification state.
+type TenantManifest struct {
+	Version  int                        `json:"version"`
+	Skills   map[string]TenantSkillMeta `json:"skills"`
+	SyncedAt time.Time                  `json:"synced_at"`
+}
+
+// TenantSkillMeta holds per-skill metadata stored in the manifest.
+type TenantSkillMeta struct {
+	Source       string    `json:"source"`
+	UserModified bool      `json:"user_modified"`
+	InstalledAt  time.Time `json:"installed_at"`
+}
+
+const manifestKey = "/.manifest.json"
+
+func loadManifest(ctx context.Context, mc *objstore.MinIOClient, tenantID string) (*TenantManifest, error) {
+	data, err := mc.GetObject(ctx, tenantID+manifestKey)
+	if err != nil {
+		return &TenantManifest{Version: 1, Skills: make(map[string]TenantSkillMeta)}, nil
+	}
+	var m TenantManifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return &TenantManifest{Version: 1, Skills: make(map[string]TenantSkillMeta)}, nil
+	}
+	if m.Skills == nil {
+		m.Skills = make(map[string]TenantSkillMeta)
+	}
+	return &m, nil
+}
+
+func saveManifest(ctx context.Context, mc *objstore.MinIOClient, tenantID string, m *TenantManifest) error {
+	m.SyncedAt = time.Now()
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal manifest: %w", err)
+	}
+	return mc.PutObject(ctx, tenantID+manifestKey, data)
+}
+
+// LoadTenantManifestPublic returns the tenant skill manifest for read-only use.
+func LoadTenantManifestPublic(ctx context.Context, mc *objstore.MinIOClient, tenantID string) (*TenantManifest, error) {
+	return loadManifest(ctx, mc, tenantID)
+}
+
+// MarkSkillUserModified flags a skill as manually modified by the tenant user.
+func MarkSkillUserModified(ctx context.Context, mc *objstore.MinIOClient, tenantID, skillName string) error {
+	m, err := loadManifest(ctx, mc, tenantID)
+	if err != nil {
+		return err
+	}
+	meta := m.Skills[skillName]
+	meta.UserModified = true
+	if meta.InstalledAt.IsZero() {
+		meta.InstalledAt = time.Now()
+	}
+	m.Skills[skillName] = meta
+	return saveManifest(ctx, mc, tenantID, m)
+}
 
 // defaultSoulContent mirrors cli.DefaultSoulMD to avoid import cycle (skills → cli → agent → skills).
 const defaultSoulContent = `# Hermes Agent

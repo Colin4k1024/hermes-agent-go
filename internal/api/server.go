@@ -36,7 +36,7 @@ type APIServerConfig struct {
 type APIServer struct {
 	cfg      APIServerConfig
 	server   *http.Server
-	MockChat *mockChatHandler // accessible for testing/debugging
+	MockChat *chatHandler // accessible for testing/debugging
 }
 
 // spaFallback wraps the API mux: serves index.html for root "/" and admin.html,
@@ -134,6 +134,13 @@ func NewAPIServer(cfg APIServerConfig) *APIServer {
 	// Session history API (per-user session and message history).
 	api.HandleFunc("GET /v1/sessions", mockChat.handleListUserSessions)
 	api.HandleFunc("GET /v1/sessions/", mockChat.handleGetSessionMessages)
+
+	// Per-tenant skills management API.
+	if cfg.SkillsClient != nil {
+		skillHandler := NewSkillHandler(cfg.SkillsClient)
+		api.Handle("/v1/skills", skillHandler)
+		api.Handle("/v1/skills/", skillHandler)
+	}
 
 	mux.Handle("/v1/", stack.Wrap(api))
 

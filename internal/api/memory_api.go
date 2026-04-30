@@ -15,7 +15,7 @@ type memoryEntry struct {
 	Content string `json:"content"`
 }
 
-func (h *mockChatHandler) handleListMemories(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleListMemories(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -64,7 +64,7 @@ func (h *mockChatHandler) handleListMemories(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *mockChatHandler) handleDeleteMemory(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleDeleteMemory(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -100,7 +100,7 @@ func (h *mockChatHandler) handleDeleteMemory(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *mockChatHandler) handleListUserSessions(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleListUserSessions(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -170,7 +170,7 @@ func (h *mockChatHandler) handleListUserSessions(w http.ResponseWriter, r *http.
 	})
 }
 
-func (h *mockChatHandler) handleGetSessionMessages(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleGetSessionMessages(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)

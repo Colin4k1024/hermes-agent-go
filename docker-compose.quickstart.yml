@@ -1,0 +1,114 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hermes-qs-pg
+    environment:
+      POSTGRES_DB: hermes
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: hermes
+    volumes:
+      - qs_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: hermes-qs-redis
+    volumes:
+      - qs_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: hermes-qs-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: hermes
+      MINIO_ROOT_PASSWORD: hermespass
+    volumes:
+      - qs_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  hermes-saas:
+    build:
+      context: .
+      dockerfile: Dockerfile.saas
+    container_name: hermes-qs-saas
+    command: ["saas-api"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Storage
+      DATABASE_URL: postgres://hermes:hermes@postgres:5432/hermes?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      # MinIO
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: hermes
+      MINIO_SECRET_KEY: hermespass
+      MINIO_BUCKET: hermes-skills
+      # SaaS API
+      SAAS_API_PORT: "8080"
+      SAAS_ALLOWED_ORIGINS: "*"
+      SAAS_STATIC_DIR: /static
+      HERMES_ACP_TOKEN: ${HERMES_ACP_TOKEN:-dev-bootstrap-token}
+      # LLM — set via .env file (see .env.example)
+      LLM_API_URL: ${LLM_API_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL}
+      # Debug
+      HERMES_DEBUG: "false"
+    volumes:
+      - ./skills:/home/hermes/skills:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  bootstrap:
+    image: alpine:3.19
+    container_name: hermes-qs-bootstrap
+    command: >
+      sh -c "apk add --no-cache bash curl wget python3 ca-certificates 2>/dev/null
+             && /scripts/bootstrap.sh"
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./tests/fixtures:/fixtures
+    environment:
+      BASE_URL: http://hermes-saas:8080
+      HERMES_ACP_TOKEN: ${HERMES_ACP_TOKEN:-dev-bootstrap-token}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: hermes
+      MINIO_SECRET_KEY: hermespass
+      MINIO_BUCKET: hermes-skills
+      FIXTURES_DIR: /fixtures
+    depends_on:
+      hermes-saas:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  qs_postgres_data:
+  qs_redis_data:
+  qs_minio_data:

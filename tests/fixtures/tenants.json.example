@@ -1,0 +1,16 @@
+{
+  "tenants": {
+    "pirate": {
+      "id": "YOUR-PIRATE-TENANT-UUID",
+      "name": "IsolationTest-Pirate",
+      "apiKey": "hk_your_pirate_api_key_here",
+      "userID": "pirate-user-001"
+    },
+    "academic": {
+      "id": "YOUR-ACADEMIC-TENANT-UUID",
+      "name": "IsolationTest-Academic",
+      "apiKey": "hk_your_academic_api_key_here",
+      "userID": "academic-user-001"
+    }
+  }
+}

@@ -27,10 +27,10 @@ type chatMessage struct {
 	Content string `json:"content"`
 }
 
-// mockChatHandler handles chat requests. It stores messages per (tenant, session)
+// chatHandler handles chat requests. It stores messages per (tenant, session)
 // in PostgreSQL and calls a real LLM API to generate responses, enabling true
 // multi-tenant isolation with real AI responses and persistent conversation history.
-type mockChatHandler struct {
+type chatHandler struct {
 	store        store.Store
 	pool         *pgxpool.Pool // direct pool access for memory operations
 	llmURL       string
@@ -66,8 +66,8 @@ const soulCacheTTL = 30 * time.Minute
 const defaultSoul = `You are a helpful, knowledgeable, and friendly AI assistant.
 Be concise, accurate, and helpful in all your responses.`
 
-func newMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *mockChatHandler {
-	return &mockChatHandler{
+func newMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *chatHandler {
+	return &chatHandler{
 		store:        s,
 		pool:         pool,
 		llmURL:       getEnvOr("LLM_API_URL", "http://localhost:8000"),
@@ -115,7 +115,7 @@ type chatUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, userID, sessionID string, messages []chatMessage) (string, error) {
+func (h *chatHandler) callLLM(ctx context.Context, tenantID, userID, sessionID string, messages []chatMessage) (string, error) {
 	// Build system prompt with tenant context
 	// Strip dashes from UUID so the first 8 chars are a compact, unique prefix.
 	tenantCompact := strings.ReplaceAll(tenantID, "-", "")
@@ -190,7 +190,7 @@ func (h *mockChatHandler) callLLM(ctx context.Context, tenantID, userID, session
 // getSkillsPrompt returns the skills section of the system prompt for a tenant.
 // It caches loaded skills per tenant to avoid repeated MinIO fetches.
 // When MinIO is unavailable, it returns an empty string gracefully.
-func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) string {
+func (h *chatHandler) getSkillsPrompt(ctx context.Context, tenantID string) string {
 	if h.skillsClient == nil {
 		return ""
 	}
@@ -236,7 +236,7 @@ func (h *mockChatHandler) getSkillsPrompt(ctx context.Context, tenantID string) 
 
 // getSoulPrompt returns the persona/soul content for a tenant.
 // It loads {tenantID}/SOUL.md from MinIO, caches it, and falls back to defaultSoul.
-func (h *mockChatHandler) getSoulPrompt(ctx context.Context, tenantID string) string {
+func (h *chatHandler) getSoulPrompt(ctx context.Context, tenantID string) string {
 	if h.skillsClient == nil {
 		return defaultSoul
 	}
@@ -282,7 +282,7 @@ func (h *mockChatHandler) getSoulPrompt(ctx context.Context, tenantID string) st
 }
 
 // sendMsg is like Messages.Append but logs the result for debugging.
-func (h *mockChatHandler) sendMsg(ctx context.Context, tenantID, sessionID string, role, content string) int64 {
+func (h *chatHandler) sendMsg(ctx context.Context, tenantID, sessionID string, role, content string) int64 {
 	id, err := h.store.Messages().Append(ctx, tenantID, sessionID, &store.Message{
 		TenantID:  tenantID,
 		SessionID: sessionID,
@@ -299,7 +299,7 @@ func (h *mockChatHandler) sendMsg(ctx context.Context, tenantID, sessionID strin
 
 // ServeHTTP handles POST /v1/chat/completions.
 // All messages are persisted to PostgreSQL and loaded from there on each request.
-func (h *mockChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -437,7 +437,7 @@ type sessionInfo struct {
 }
 
 // handleMockSessionList handles GET /v1/mock-sessions.
-func (h *mockChatHandler) handleSessionList(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleSessionList(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
 	if !ok || ac == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -469,7 +469,7 @@ func (h *mockChatHandler) handleSessionList(w http.ResponseWriter, r *http.Reque
 }
 
 // handleMockClearSession handles DELETE /v1/mock-sessions/:id.
-func (h *mockChatHandler) handleClearSession(w http.ResponseWriter, r *http.Request) {
+func (h *chatHandler) handleClearSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -488,7 +488,7 @@ func (h *mockChatHandler) handleClearSession(w http.ResponseWriter, r *http.Requ
 }
 
 // buildMemoryBlock loads user memories from PG and formats them for the system prompt.
-func (h *mockChatHandler) buildMemoryBlock(ctx context.Context, tenantID, userID string) string {
+func (h *chatHandler) buildMemoryBlock(ctx context.Context, tenantID, userID string) string {
 	if h.pool == nil {
 		return ""
 	}
@@ -497,7 +497,7 @@ func (h *mockChatHandler) buildMemoryBlock(ctx context.Context, tenantID, userID
 }
 
 // buildRecentSessionContext loads recent messages from other sessions for cross-session context.
-func (h *mockChatHandler) buildRecentSessionContext(ctx context.Context, tenantID, userID, currentSessionID string) string {
+func (h *chatHandler) buildRecentSessionContext(ctx context.Context, tenantID, userID, currentSessionID string) string {
 	if h.pool == nil {
 		return ""
 	}
@@ -552,6 +552,6 @@ func (h *mockChatHandler) buildRecentSessionContext(ctx context.Context, tenantI
 }
 
 // NewMockChatHandler creates a mock chat handler wired into the SaaS API server.
-func NewMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *mockChatHandler {
+func NewMockChatHandler(s store.Store, pool *pgxpool.Pool, skillsClient *objstore.MinIOClient) *chatHandler {
 	return newMockChatHandler(s, pool, skillsClient)
 }

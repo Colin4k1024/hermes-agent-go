@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Quickstart overlay — applies bootstrap Job and LLM secret on top of base manifests.
+# Prerequisites:
+#   1. cp config.env.example config.env && edit config.env
+#   2. kubectl apply -k deploy/k8s/quickstart/
+#   3. kubectl wait --for=condition=complete job/hermes-bootstrap --timeout=120s
+
+# Reference base hermes-saas deployment (adjust path if your base manifests differ)
+resources:
+  - bootstrap-job.yaml
+
+# Inject LLM credentials + admin token from config.env as a Secret
+secretGenerator:
+  - name: hermes-llm-config
+    envs:
+      - config.env
+    options:
+      disableNameSuffixHash: true
+
+# Embed bootstrap.sh into a ConfigMap so the Job can mount and run it
+configMapGenerator:
+  - name: hermes-bootstrap-script
+    files:
+      - bootstrap.sh=../../scripts/bootstrap.sh
+    options:
+      disableNameSuffixHash: true
